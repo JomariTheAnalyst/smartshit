@@ -17,7 +17,9 @@ import {
   Table, 
   ChartBar, 
   Function, 
-  Wand2 
+  Wand2,
+  Moon,
+  Sun
 } from 'lucide-react'
 
 interface RibbonToolbarProps {
@@ -32,6 +34,8 @@ interface RibbonToolbarProps {
   onFormatChange?: (format: Partial<CellFormat>) => void
   currentFormat?: Partial<CellFormat>
   onCreateChart?: () => void
+  onToggleTheme?: () => void
+  theme?: 'light' | 'dark'
 }
 
 export default function RibbonToolbar({
@@ -45,14 +49,16 @@ export default function RibbonToolbar({
   canRedo,
   onFormatChange,
   currentFormat = {},
-  onCreateChart
+  onCreateChart,
+  onToggleTheme,
+  theme = 'light'
 }: RibbonToolbarProps) {
   const [activeTab, setActiveTab] = useState('home')
   
   return (
     <div className="ribbon-toolbar border-b">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-gray-100">
+        <TabsList className="bg-gray-100 dark:bg-gray-800">
           <TabsTrigger value="home">Home</TabsTrigger>
           <TabsTrigger value="insert">Insert</TabsTrigger>
           <TabsTrigger value="page-layout">Page Layout</TabsTrigger>
@@ -136,6 +142,24 @@ export default function RibbonToolbar({
                   <span className="text-xs">AI Assistant</span>
                 </Button>
               </div>
+              
+              {onToggleTheme && (
+                <div className="flex flex-col items-center">
+                  <Button variant="ghost" size="sm" onClick={onToggleTheme}>
+                    {theme === 'light' ? (
+                      <>
+                        <Moon className="h-4 w-4 mr-1" />
+                        <span className="text-xs">Dark Mode</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sun className="h-4 w-4 mr-1" />
+                        <span className="text-xs">Light Mode</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
           
@@ -263,6 +287,53 @@ export default function RibbonToolbar({
                   <span className="text-xs">Hide Headers</span>
                 </Button>
               </div>
+              
+              {onToggleTheme && (
+                <div className="flex flex-col items-center">
+                  <Button variant="ghost" size="sm" onClick={onToggleTheme}>
+                    {theme === 'light' ? (
+                      <>
+                        <Moon className="h-4 w-4 mr-1" />
+                        <span className="text-xs">Dark Mode</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sun className="h-4 w-4 mr-1" />
+                        <span className="text-xs">Light Mode</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {activeTab === 'settings' && (
+            <div className="flex items-center space-x-4">
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm" onClick={onAIAssistant}>
+                  <Wand2 className="h-4 w-4 mr-1" />
+                  <span className="text-xs">AI Settings</span>
+                </Button>
+              </div>
+              
+              {onToggleTheme && (
+                <div className="flex flex-col items-center">
+                  <Button variant="ghost" size="sm" onClick={onToggleTheme}>
+                    {theme === 'light' ? (
+                      <>
+                        <Moon className="h-4 w-4 mr-1" />
+                        <span className="text-xs">Dark Mode</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sun className="h-4 w-4 mr-1" />
+                        <span className="text-xs">Light Mode</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>

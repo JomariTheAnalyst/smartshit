@@ -1,71 +1,90 @@
 import { useState, useCallback } from 'react'
 import { CellDragEvent } from '@/types/spreadsheet'
 
+interface DragSelection {
+  startRow: number
+  startCol: number
+  endRow: number
+  endCol: number
+}
+
 interface UseDragAndDropProps {
   onDragComplete: (event: CellDragEvent) => void
 }
 
 export function useDragAndDrop({ onDragComplete }: UseDragAndDropProps) {
   const [isDragging, setIsDragging] = useState(false)
-  const [dragStartCell, setDragStartCell] = useState<{ row: number; col: number } | null>(null)
-  const [dragEndCell, setDragEndCell] = useState<{ row: number; col: number } | null>(null)
+  const [dragStartRow, setDragStartRow] = useState<number | null>(null)
+  const [dragStartCol, setDragStartCol] = useState<number | null>(null)
+  const [dragEndRow, setDragEndRow] = useState<number | null>(null)
+  const [dragEndCol, setDragEndCol] = useState<number | null>(null)
   
   // Start dragging
   const handleDragStart = useCallback((row: number, col: number) => {
     setIsDragging(true)
-    setDragStartCell({ row, col })
-    setDragEndCell({ row, col })
+    setDragStartRow(row)
+    setDragStartCol(col)
+    setDragEndRow(row)
+    setDragEndCol(col)
   }, [])
   
-  // Update drag end position
+  // Update drag position
   const handleDragOver = useCallback((row: number, col: number) => {
-    if (isDragging) {
-      setDragEndCell({ row, col })
-    }
+    if (!isDragging) return
+    
+    setDragEndRow(row)
+    setDragEndCol(col)
   }, [isDragging])
   
-  // Complete the drag operation
+  // End dragging
   const handleDragEnd = useCallback((isCopy: boolean = false) => {
-    if (isDragging && dragStartCell && dragEndCell) {
-      onDragComplete({
-        sourceRow: dragStartCell.row,
-        sourceCol: dragStartCell.col,
-        targetRow: dragEndCell.row,
-        targetCol: dragEndCell.col,
-        isCopy
-      })
+    if (!isDragging || dragStartRow === null || dragStartCol === null || dragEndRow === null || dragEndCol === null) {
+      setIsDragging(false)
+      return
     }
     
+    // Call the onDragComplete callback
+    onDragComplete({
+      sourceRow: dragStartRow,
+      sourceCol: dragStartCol,
+      targetRow: dragEndRow,
+      targetCol: dragEndCol,
+      isCopy
+    })
+    
+    // Reset drag state
     setIsDragging(false)
-    setDragStartCell(null)
-    setDragEndCell(null)
-  }, [isDragging, dragStartCell, dragEndCell, onDragComplete])
+    setDragStartRow(null)
+    setDragStartCol(null)
+    setDragEndRow(null)
+    setDragEndCol(null)
+  }, [isDragging, dragStartRow, dragStartCol, dragEndRow, dragEndCol, onDragComplete])
   
-  // Cancel the drag operation
+  // Cancel dragging
   const handleDragCancel = useCallback(() => {
     setIsDragging(false)
-    setDragStartCell(null)
-    setDragEndCell(null)
+    setDragStartRow(null)
+    setDragStartCol(null)
+    setDragEndRow(null)
+    setDragEndCol(null)
   }, [])
   
-  // Get the drag selection
-  const getDragSelection = useCallback(() => {
-    if (!isDragging || !dragStartCell || !dragEndCell) {
+  // Get the current drag selection
+  const getDragSelection = useCallback((): DragSelection | null => {
+    if (!isDragging || dragStartRow === null || dragStartCol === null || dragEndRow === null || dragEndCol === null) {
       return null
     }
     
     return {
-      startRow: Math.min(dragStartCell.row, dragEndCell.row),
-      startCol: Math.min(dragStartCell.col, dragEndCell.col),
-      endRow: Math.max(dragStartCell.row, dragEndCell.row),
-      endCol: Math.max(dragStartCell.col, dragEndCell.col)
+      startRow: Math.min(dragStartRow, dragEndRow),
+      startCol: Math.min(dragStartCol, dragEndCol),
+      endRow: Math.max(dragStartRow, dragEndRow),
+      endCol: Math.max(dragStartCol, dragEndCol)
     }
-  }, [isDragging, dragStartCell, dragEndCell])
+  }, [isDragging, dragStartRow, dragStartCol, dragEndRow, dragEndCol])
   
   return {
     isDragging,
-    dragStartCell,
-    dragEndCell,
     handleDragStart,
     handleDragOver,
     handleDragEnd,

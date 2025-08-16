@@ -1,99 +1,55 @@
-export type CellValue = string | number | boolean | null | CellValue[][]
-
-export type CellType = 'text' | 'number' | 'formula' | 'date' | 'boolean'
+export interface Cell {
+  value: string | number | boolean | null
+  displayValue?: string
+  type: 'text' | 'number' | 'boolean' | 'formula' | 'date'
+  format?: CellFormat
+}
 
 export interface CellFormat {
-  // Text formatting
+  textAlign?: 'left' | 'center' | 'right'
+  verticalAlign?: 'top' | 'middle' | 'bottom'
   fontFamily?: string
   fontSize?: number
   fontWeight?: 'normal' | 'bold'
   fontStyle?: 'normal' | 'italic'
   textDecoration?: 'none' | 'underline' | 'line-through'
   color?: string
-  
-  // Cell formatting
   backgroundColor?: string
-  border?: {
-    top?: string
-    right?: string
-    bottom?: string
-    left?: string
-  }
-  
-  // Alignment
-  horizontalAlign?: 'left' | 'center' | 'right'
-  verticalAlign?: 'top' | 'middle' | 'bottom'
-  
-  // Number formatting
+  border?: string
   numberFormat?: string
-  
-  // Conditional formatting
-  conditionalFormat?: ConditionalFormat[]
+  dateFormat?: string
+  conditionalFormat?: ConditionalFormat
 }
 
 export interface ConditionalFormat {
-  type: 'dataBar' | 'colorScale' | 'iconSet' | 'rule'
-  rule?: {
-    type: 'greaterThan' | 'lessThan' | 'equal' | 'between' | 'containsText' | 'dateOccurring'
-    value1?: CellValue
-    value2?: CellValue
-    format: Partial<CellFormat>
-  }
-  dataBar?: {
-    minType: 'number' | 'percent' | 'formula' | 'percentile'
-    minValue: number
-    maxType: 'number' | 'percent' | 'formula' | 'percentile'
-    maxValue: number
-    barColor: string
-  }
-  colorScale?: {
-    min: { type: 'number' | 'percent' | 'formula' | 'percentile'; value: number; color: string }
-    mid?: { type: 'number' | 'percent' | 'formula' | 'percentile'; value: number; color: string }
-    max: { type: 'number' | 'percent' | 'formula' | 'percentile'; value: number; color: string }
-  }
-  iconSet?: {
-    type: '3Arrows' | '3ArrowsGray' | '3Flags' | '3TrafficLights' | '3Signs' | '3Symbols' | '3Symbols2'
-    reverse?: boolean
-    showIconOnly?: boolean
-  }
-}
-
-export interface Cell {
-  row: number
-  col: number
-  value: string
-  displayValue: CellValue
-  type: CellType
+  type: 'greaterThan' | 'lessThan' | 'equal' | 'between' | 'contains' | 'notContains'
+  value1: number | string
+  value2?: number | string
   format: Partial<CellFormat>
 }
 
 export interface Sheet {
-  id: string
   name: string
-  cells: { [key: string]: Cell }
   rowCount: number
   columnCount: number
-  rowHeights: { [key: number]: number }
+  cells: { [key: string]: Cell }
   columnWidths: { [key: number]: number }
-  mergedCells: { [key: string]: { startRow: number; startCol: number; endRow: number; endCol: number } }
+  rowHeights: { [key: number]: number }
+  mergedCells: MergedCell[]
   hidden: boolean
 }
 
-export interface Workbook {
-  id: string
-  name: string
-  sheets: Sheet[]
-  activeSheetIndex: number
-  created: string
-  modified: string
-  author: string
-}
-
-export interface Selection {
+export interface MergedCell {
   startRow: number
   startCol: number
   endRow: number
   endCol: number
+}
+
+export interface Workbook {
+  name: string
+  sheets: Sheet[]
+  activeSheetIndex: number
 }
 
 export interface ActiveCell {
@@ -101,30 +57,11 @@ export interface ActiveCell {
   col: number
 }
 
-export interface CellChange {
-  sheetIndex: number
-  row: number
-  col: number
-  value: string
-}
-
-export interface FormatChange {
-  sheetIndex: number
-  row: number
-  col: number
-  format: Partial<CellFormat>
-}
-
-export interface SheetChange {
-  type: 'add' | 'remove' | 'rename' | 'reorder'
-  sheetIndex: number
-  newName?: string
-  newIndex?: number
-}
-
-export interface WorkbookChange {
-  type: 'rename'
-  newName: string
+export interface Selection {
+  startRow: number
+  startCol: number
+  endRow: number
+  endCol: number
 }
 
 export interface CellDragEvent {
@@ -136,14 +73,14 @@ export interface CellDragEvent {
 }
 
 export interface ChartOptions {
-  type: 'bar' | 'line' | 'pie' | 'scatter' | 'area' | 'radar' | 'bubble'
+  type: 'bar' | 'line' | 'pie' | 'scatter'
   title?: string
   dataRange: string
   headerRow?: boolean
   headerColumn?: boolean
-  legendPosition?: 'top' | 'right' | 'bottom' | 'left' | 'none'
   xAxisTitle?: string
   yAxisTitle?: string
+  legendPosition?: 'top' | 'right' | 'bottom' | 'left'
   colors?: string[]
 }
 
@@ -157,5 +94,17 @@ export interface Chart {
     width: number
     height: number
   }
+}
+
+export interface SpreadsheetState {
+  workbook: Workbook
+  activeCell: ActiveCell | null
+  selection: Selection | null
+  isEditing: boolean
+  setCellValue: (row: number, col: number, value: string | number | boolean | null) => void
+  setActiveCell: (row: number, col: number) => void
+  setSelection: (selection: Selection | null) => void
+  startEditing: () => void
+  stopEditing: () => void
 }
 

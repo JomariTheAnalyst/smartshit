@@ -21,6 +21,7 @@ import { MoveCellCommand, CopyCellCommand, MoveRangeCommand, CopyRangeCommand } 
 import { exportWorkbook } from '@/lib/io/xlsx'
 import { formatCellReference } from '@/lib/utils'
 import { CellFormat, CellDragEvent, ChartOptions, Chart } from '@/types/spreadsheet'
+import { AIAction } from '@/types/ai'
 
 export default function Spreadsheet() {
   // State
@@ -29,6 +30,7 @@ export default function Spreadsheet() {
   const [showAIPanel, setShowAIPanel] = useState(false)
   const [showChartCreator, setShowChartCreator] = useState(false)
   const [charts, setCharts] = useState<Chart[]>([])
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
   
   // Hooks
   const {
@@ -263,6 +265,18 @@ export default function Spreadsheet() {
     setShowAIPanel(prev => !prev)
   }, [])
   
+  // Toggle theme
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light')
+    
+    // Apply theme to document
+    if (theme === 'light') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [theme])
+  
   // Open chart creator
   const openChartCreator = useCallback(() => {
     setShowChartCreator(true)
@@ -308,20 +322,70 @@ export default function Spreadsheet() {
     ))
   }, [])
   
+  // Handle AI action
+  const handleAIAction = useCallback((action: AIAction) => {
+    if (!action) return
+    
+    switch (action.type) {
+      case 'formula_suggestion':
+        if (activeCell) {
+          const command = new SetCellValueCommand(
+            engine,
+            workbook.activeSheetIndex,
+            activeCell.row,
+            activeCell.col,
+            action.parameters.formula
+          )
+          execute(command)
+        }
+        break
+        
+      case 'chart_suggestion':
+        const chartOptions: ChartOptions = {
+          type: action.parameters.type,
+          title: `${action.parameters.type.charAt(0).toUpperCase() + action.parameters.type.slice(1)} Chart`,
+          dataRange: selection 
+            ? `${String.fromCharCode(65 + selection.startCol)}${selection.startRow + 1}:${String.fromCharCode(65 + selection.endCol)}${selection.endRow + 1}`
+            : '',
+          headerRow: true,
+          headerColumn: false,
+          legendPosition: 'top'
+        }
+        
+        handleCreateChart(chartOptions)
+        break
+        
+      case 'data_cleaning_suggestion':
+        // This would be more sophisticated in a real implementation
+        // For now, we'll just show a message
+        alert('Data cleaning would be performed here')
+        break
+        
+      default:
+        console.warn('Unknown action type:', action.type)
+    }
+  }, [activeCell, engine, workbook.activeSheetIndex, execute, selection, handleCreateChart])
+  
   // Handle sending a message to the AI assistant
   const handleSendMessage = useCallback(async (message: string) => {
     // Get the current context
     const context = {
       activeSheet: workbook.sheets[workbook.activeSheetIndex].name,
       activeCell: activeCell ? formatCellReference(activeCell.col, activeCell.row) : null,
-      selection: selection ? getSelectedRange() : null
+      selection: selection ? getSelectedRange() : null,
+      data: getSheetData() // Pass the sheet data for analysis
     }
     
     // Process the message with the AI orchestrator
-    const response = await aiOrchestrator.processRequest(message, context)
+    const result = await aiOrchestrator.processRequest(message, context)
     
-    return response.response
+    return result.response
   }, [workbook, workbook.activeSheetIndex, activeCell, selection, getSelectedRange, aiOrchestrator])
+  
+  // Handle clearing AI memory
+  const handleClearAIMemory = useCallback(() => {
+    aiOrchestrator.resetContext()
+  }, [aiOrchestrator])
   
   // Get the active sheet
   const activeSheet = workbook.sheets[workbook.activeSheetIndex]
@@ -340,21 +404,31 @@ export default function Spreadsheet() {
     ? engine.getCellByPosition(workbook.activeSheetIndex, activeCell.row, activeCell.col)?.format || {}
     : {}
   
-  // Get the sheet data for charts
-  const sheetData = Object.entries(activeSheet.cells).reduce((data, [key, cell]) => {
-    const [row, col] = key.split(',').map(Number)
+  // Get the sheet data for charts and AI analysis
+  function getSheetData(): any[][] {
+    const data: any[][] = []
     
-    if (!data[row]) {
+    // Initialize with empty rows
+    for (let row = 0; row < activeSheet.rowCount; row++) {
       data[row] = []
+      for (let col = 0; col < activeSheet.columnCount; col++) {
+        data[row][col] = null
+      }
     }
     
-    data[row][col] = cell.displayValue
+    // Fill in the data from cells
+    for (const key in activeSheet.cells) {
+      const [row, col] = key.split(',').map(Number)
+      data[row][col] = activeSheet.cells[key].displayValue
+    }
     
     return data
-  }, [] as any[][])
+  }
+  
+  const sheetData = getSheetData()
   
   return (
-    <div className="spreadsheet-container flex flex-col h-screen">
+    <div className={`spreadsheet-container flex flex-col h-screen ${theme === 'dark' ? 'dark' : ''}`}>
       <RibbonToolbar
         onSave={handleSave}
         onImport={handleImport}
@@ -367,6 +441,8 @@ export default function Spreadsheet() {
         onFormatChange={handleCellFormatChange}
         currentFormat={activeCellFormat}
         onCreateChart={openChartCreator}
+        onToggleTheme={toggleTheme}
+        theme={theme}
       />
       
       <div className="flex flex-1 overflow-hidden">
@@ -408,7 +484,10 @@ export default function Spreadsheet() {
         
         {showAIPanel && (
           <div className="w-80">
-            <AIPanel onSendMessage={handleSendMessage} />
+            <AIPanel 
+              onSendMessage={handleSendMessage} 
+              onClearMemory={handleClearAIMemory}
+            />
           </div>
         )}
       </div>

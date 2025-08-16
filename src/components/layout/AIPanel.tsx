@@ -3,13 +3,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Send, Sparkles } from 'lucide-react'
+import { Send, Sparkles, Lightbulb, Trash2, Info } from 'lucide-react'
 import AIActionVerification from '@/components/ai/AIActionVerification'
 import { AIAction } from '@/types/ai'
 
 interface Message {
   id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: Date
   actions?: AIAction[]
@@ -17,14 +17,27 @@ interface Message {
 
 interface AIAssistantProps {
   onSendMessage: (message: string) => Promise<string>
+  onClearMemory?: () => void
 }
 
-export default function AIPanel({ onSendMessage }: AIAssistantProps) {
+export default function AIPanel({ onSendMessage, onClearMemory }: AIAssistantProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: '1',
+      id: 'welcome',
+      role: 'system',
+      content: 'New Chat',
+      timestamp: new Date()
+    },
+    {
+      id: 'tip',
+      role: 'system',
+      content: 'Tip: Ask Shortcut to do your work for you. Most tasks take 1-15 minutes to complete. All changes can be reverted.',
+      timestamp: new Date()
+    },
+    {
+      id: 'welcome-assistant',
       role: 'assistant',
-      content: 'Hello! I\'m your AI assistant. How can I help you with your spreadsheet today?',
+      content: 'How can I help you today?',
       timestamp: new Date()
     }
   ])
@@ -36,6 +49,15 @@ export default function AIPanel({ onSendMessage }: AIAssistantProps) {
   // For action verification
   const [pendingAction, setPendingAction] = useState<AIAction | null>(null)
   const [isVerificationOpen, setIsVerificationOpen] = useState(false)
+  
+  // Suggested prompts
+  const suggestedPrompts = [
+    'Create a formula to calculate the average of cells A1:A10',
+    'Clean missing values in column B',
+    'Create a bar chart of sales by region',
+    'Analyze this data and show me trends',
+    'Help me import a CSV file'
+  ]
   
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -65,44 +87,23 @@ export default function AIPanel({ onSendMessage }: AIAssistantProps) {
     try {
       const response = await onSendMessage(input)
       
-      // In a real implementation, the AI might return actions that require verification
-      // For demonstration purposes, let's simulate an action that requires verification
-      // about 30% of the time
-      const shouldRequireVerification = Math.random() < 0.3
+      // Extract actions from the response
+      const actions = extractActionsFromResponse(response)
       
-      if (shouldRequireVerification) {
-        const action: AIAction = {
-          type: 'formula_suggestion',
-          description: 'Add a formula to calculate the sum of the selected range',
-          parameters: {
-            formula: '=SUM(A1:B10)',
-            cell: 'C1'
-          },
-          confidence: 0.85,
-          preview: '=SUM(A1:B10) will be inserted into cell C1',
-          requiresConfirmation: true
-        }
-        
-        const assistantMessage: Message = {
-          id: Date.now().toString(),
-          role: 'assistant',
-          content: response,
-          timestamp: new Date(),
-          actions: [action]
-        }
-        
-        setMessages(prev => [...prev, assistantMessage])
-        setPendingAction(action)
+      const assistantMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: response,
+        timestamp: new Date(),
+        actions: actions.length > 0 ? actions : undefined
+      }
+      
+      setMessages(prev => [...prev, assistantMessage])
+      
+      // If there are actions, show the first one for verification
+      if (actions.length > 0) {
+        setPendingAction(actions[0])
         setIsVerificationOpen(true)
-      } else {
-        const assistantMessage: Message = {
-          id: Date.now().toString(),
-          role: 'assistant',
-          content: response,
-          timestamp: new Date()
-        }
-        
-        setMessages(prev => [...prev, assistantMessage])
       }
     } catch (error) {
       const errorMessage: Message = {
@@ -133,8 +134,8 @@ export default function AIPanel({ onSendMessage }: AIAssistantProps) {
     // For now, let's just add a confirmation message
     const confirmationMessage: Message = {
       id: Date.now().toString(),
-      role: 'assistant',
-      content: 'Action confirmed! I\'ve applied the formula =SUM(A1:B10) to cell C1.',
+      role: 'system',
+      content: `Action confirmed: ${pendingAction?.description}`,
       timestamp: new Date()
     }
     
@@ -149,8 +150,8 @@ export default function AIPanel({ onSendMessage }: AIAssistantProps) {
     // Add a cancellation message
     const cancellationMessage: Message = {
       id: Date.now().toString(),
-      role: 'assistant',
-      content: 'Action cancelled. Is there anything else you\'d like me to help with?',
+      role: 'system',
+      content: 'Action cancelled.',
       timestamp: new Date()
     }
     
@@ -158,27 +159,150 @@ export default function AIPanel({ onSendMessage }: AIAssistantProps) {
     setPendingAction(null)
   }
   
+  // Handle suggested prompt click
+  const handleSuggestedPromptClick = (prompt: string) => {
+    setInput(prompt)
+  }
+  
+  // Handle clear memory
+  const handleClearMemory = () => {
+    if (onClearMemory) {
+      onClearMemory()
+    }
+    
+    // Clear messages except for the welcome messages
+    setMessages([
+      {
+        id: 'clear',
+        role: 'system',
+        content: 'New Chat',
+        timestamp: new Date()
+      },
+      {
+        id: 'tip',
+        role: 'system',
+        content: 'Tip: Ask Shortcut to do your work for you. Most tasks take 1-15 minutes to complete. All changes can be reverted.',
+        timestamp: new Date()
+      },
+      {
+        id: 'clear-2',
+        role: 'assistant',
+        content: 'How can I help you today?',
+        timestamp: new Date()
+      }
+    ])
+  }
+  
+  // Extract actions from response
+  const extractActionsFromResponse = (response: string): AIAction[] => {
+    const actions: AIAction[] = []
+    
+    // Extract formula suggestions
+    const formulaMatch = response.match(/```(?:excel|formula)?\s*(=[\s\S]*?)```/g)
+    if (formulaMatch) {
+      for (const match of formulaMatch) {
+        const formula = match.replace(/```(?:excel|formula)?\s*/, '').replace(/```$/, '').trim()
+        
+        actions.push({
+          type: 'formula_suggestion',
+          description: 'Apply formula to the selected cell',
+          parameters: {
+            formula,
+            cell: 'active'
+          },
+          confidence: 0.9,
+          preview: formula,
+          requiresConfirmation: true
+        })
+      }
+    }
+    
+    // Extract chart suggestions
+    if (response.includes('chart') || response.includes('visualization')) {
+      const chartTypes = ['bar', 'line', 'pie', 'scatter']
+      
+      for (const type of chartTypes) {
+        if (response.toLowerCase().includes(type + ' chart')) {
+          actions.push({
+            type: 'chart_suggestion',
+            description: `Create a ${type} chart from the selected data`,
+            parameters: {
+              type,
+              dataRange: 'selection'
+            },
+            confidence: 0.8,
+            preview: `Create a ${type} chart based on the selected data`,
+            requiresConfirmation: true
+          })
+          break
+        }
+      }
+    }
+    
+    // Extract data cleaning suggestions
+    if (response.includes('clean') || response.includes('missing values') || response.includes('normalize')) {
+      actions.push({
+        type: 'data_cleaning_suggestion',
+        description: 'Clean the selected data',
+        parameters: {
+          range: 'selection'
+        },
+        confidence: 0.85,
+        preview: 'Clean data by removing missing values and normalizing formats',
+        requiresConfirmation: true
+      })
+    }
+    
+    return actions
+  }
+  
   return (
-    <div className="ai-panel flex flex-col h-full border-l">
+    <div className="ai-panel flex flex-col h-full">
+      {/* Header */}
       <div className="ai-panel-header p-3 border-b flex items-center justify-between bg-gray-50">
         <div className="flex items-center">
-          <Sparkles className="h-5 w-5 text-blue-500 mr-2" />
-          <h3 className="font-medium">AI Assistant</h3>
+          <h3 className="font-medium text-green-600">New Chat</h3>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClearMemory}
+            title="Clear memory"
+            className="h-8 w-8 p-0"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            title="Your AI Preferences"
+            className="h-8 w-8 p-0"
+          >
+            <Info className="h-4 w-4" />
+          </Button>
         </div>
       </div>
       
+      {/* Messages */}
       <div className="ai-panel-messages flex-1 overflow-y-auto p-3 space-y-4">
         {messages.map(message => (
           <div
             key={message.id}
             className={`message ${
-              message.role === 'user' ? 'user-message ml-8' : 'assistant-message mr-8'
+              message.role === 'user' 
+                ? 'user-message ml-8' 
+                : message.role === 'system'
+                ? 'system-message'
+                : 'assistant-message mr-8'
             }`}
           >
             <div
               className={`p-3 rounded-lg ${
                 message.role === 'user'
                   ? 'bg-blue-500 text-white ml-auto'
+                  : message.role === 'system'
+                  ? 'bg-gray-100 text-gray-600 text-sm italic'
                   : 'bg-gray-100 text-gray-800'
               }`}
             >
@@ -210,8 +334,8 @@ export default function AIPanel({ onSendMessage }: AIAssistantProps) {
                           // Add a message indicating the action was rejected
                           const rejectionMessage: Message = {
                             id: Date.now().toString(),
-                            role: 'assistant',
-                            content: 'Action rejected. Is there anything else you\'d like me to help with?',
+                            role: 'system',
+                            content: 'Action rejected.',
                             timestamp: new Date()
                           }
                           
@@ -226,33 +350,55 @@ export default function AIPanel({ onSendMessage }: AIAssistantProps) {
               </div>
             )}
             
-            <div
-              className={`text-xs text-gray-500 mt-1 ${
-                message.role === 'user' ? 'text-right' : 'text-left'
-              }`}
-            >
-              {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </div>
+            {message.role !== 'system' && (
+              <div
+                className={`text-xs text-gray-500 mt-1 ${
+                  message.role === 'user' ? 'text-right' : 'text-left'
+                }`}
+              >
+                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            )}
           </div>
         ))}
         <div ref={messagesEndRef} />
       </div>
       
+      {/* Suggested prompts */}
+      {messages.length <= 5 && (
+        <div className="px-3 py-2 border-t">
+          <p className="text-xs text-gray-500 mb-2">Try asking:</p>
+          <div className="flex flex-wrap gap-2">
+            {suggestedPrompts.map((prompt, index) => (
+              <button
+                key={index}
+                className="text-xs bg-gray-100 hover:bg-gray-200 rounded-full px-3 py-1 text-gray-700 flex items-center"
+                onClick={() => handleSuggestedPromptClick(prompt)}
+              >
+                <Lightbulb className="h-3 w-3 mr-1" />
+                {prompt.length > 30 ? prompt.substring(0, 30) + '...' : prompt}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Input */}
       <div className="ai-panel-input p-3 border-t">
-        <div className="flex items-center">
+        <div className="flex items-center bg-gray-100 rounded-md p-1">
           <Input
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Ask the AI assistant..."
+            placeholder="Type your message here..."
             disabled={isLoading}
-            className="flex-1"
+            className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
           />
           <Button
-            size="icon"
+            size="sm"
             onClick={handleSendMessage}
             disabled={isLoading || !input.trim()}
-            className="ml-2"
+            className="ml-1 bg-green-600 hover:bg-green-700 text-white"
           >
             <Send className="h-4 w-4" />
           </Button>
@@ -260,6 +406,7 @@ export default function AIPanel({ onSendMessage }: AIAssistantProps) {
         {isLoading && <p className="text-xs text-gray-500 mt-1">AI is thinking...</p>}
       </div>
       
+      {/* Action verification dialog */}
       <AIActionVerification
         action={pendingAction}
         isOpen={isVerificationOpen}

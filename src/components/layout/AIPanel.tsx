@@ -2,17 +2,13 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
-import { Wand2, X, Send, Loader2 } from 'lucide-react'
+import { Wand2, X, Send, Loader2, PaperPlane } from 'lucide-react'
 
 interface AIPanelProps {
-  isOpen: boolean
-  onClose: () => void
   onSendMessage: (message: string) => Promise<string>
 }
 
 export default function AIPanel({
-  isOpen,
-  onClose,
   onSendMessage
 }: AIPanelProps) {
   const [message, setMessage] = useState('')
@@ -29,10 +25,8 @@ export default function AIPanel({
   
   // Focus the input when the panel opens
   useEffect(() => {
-    if (isOpen) {
-      inputRef.current?.focus()
-    }
-  }, [isOpen])
+    inputRef.current?.focus()
+  }, [])
   
   // Scroll to the bottom when the conversation changes
   useEffect(() => {
@@ -79,17 +73,14 @@ export default function AIPanel({
     }
   }
   
-  if (!isOpen) return null
-  
   return (
-    <div className="ai-panel fixed right-0 top-0 bottom-0 w-80 bg-background border-l shadow-lg flex flex-col z-10">
-      <div className="ai-panel-header flex items-center justify-between p-3 border-b">
+    <div className="ai-panel h-full flex flex-col border-l">
+      <div className="ai-panel-header flex items-center justify-between p-2 border-b bg-muted">
         <div className="flex items-center">
-          <Wand2 className="h-5 w-5 mr-2 text-primary" />
-          <h3 className="font-medium">AI Assistant</h3>
+          <span className="font-medium text-sm">New Chat</span>
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          <X className="h-4 w-4" />
+        <Button variant="ghost" size="sm" className="text-xs">
+          + New Chat
         </Button>
       </div>
       
@@ -114,7 +105,7 @@ export default function AIPanel({
               }`}
             >
               <div
-                className={`p-3 rounded-lg ${
+                className={`p-2 rounded-lg text-sm ${
                   msg.role === 'user'
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted'
@@ -128,8 +119,8 @@ export default function AIPanel({
         
         {isLoading && (
           <div className="message assistant-message mr-4">
-            <div className="p-3 rounded-lg bg-muted flex items-center">
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            <div className="p-2 rounded-lg bg-muted flex items-center text-sm">
+              <Loader2 className="h-3 w-3 mr-2 animate-spin" />
               Thinking...
             </div>
           </div>
@@ -138,25 +129,29 @@ export default function AIPanel({
         <div ref={messagesEndRef} />
       </div>
       
-      <div className="ai-panel-input p-3 border-t">
+      <div className="ai-panel-input p-2 border-t">
         <div className="flex items-end">
           <textarea
             ref={inputRef}
-            className="flex-1 p-2 border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder="Ask the AI Assistant..."
+            className="flex-1 p-2 text-sm border rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+            placeholder="Type your message here..."
             rows={2}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyPress}
           />
           <Button
-            className="ml-2"
+            className="ml-2 h-8 w-8 p-0"
             size="sm"
             onClick={handleSendMessage}
             disabled={!message.trim() || isLoading}
           >
-            <Send className="h-4 w-4" />
+            <PaperPlane className="h-4 w-4" />
           </Button>
+        </div>
+        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+          <span>Make targeted edits</span>
+          <span>Prompt history</span>
         </div>
       </div>
     </div>

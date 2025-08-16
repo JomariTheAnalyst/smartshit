@@ -19,7 +19,6 @@ import { formatCellReference } from '@/lib/utils'
 
 export default function Spreadsheet() {
   // State
-  const [isAIPanelOpen, setIsAIPanelOpen] = useState(false)
   const [engine] = useState(() => new SpreadsheetEngine(useSpreadsheetStore.getState().workbook))
   const [aiOrchestrator] = useState(() => new AIOrchestrator())
   
@@ -167,11 +166,6 @@ export default function Spreadsheet() {
     exportWorkbook(workbook)
   }, [workbook])
   
-  // Handle AI assistant
-  const handleAIAssistant = useCallback(() => {
-    setIsAIPanelOpen(true)
-  }, [])
-  
   // Handle sending a message to the AI assistant
   const handleSendMessage = useCallback(async (message: string) => {
     // Get the current context
@@ -182,7 +176,7 @@ export default function Spreadsheet() {
     }
     
     // Process the message with the AI orchestrator
-    const response = await aiOrchestrator.processRequest(message)
+    const response = await aiOrchestrator.processRequest(message, context)
     
     return response.response
   }, [workbook, workbook.activeSheetIndex, activeCell, selection, getSelectedRange, aiOrchestrator])
@@ -209,33 +203,35 @@ export default function Spreadsheet() {
         onRedo={redo}
         canUndo={canUndo}
         canRedo={canRedo}
-        onAIAssistant={handleAIAssistant}
+        onAIAssistant={() => {}}
       />
       
-      <Grid
-        sheet={activeSheet}
-        activeCell={activeCell}
-        selection={selection}
-        isEditing={isEditing}
-        onCellClick={handleCellClick}
-        onCellDoubleClick={handleCellDoubleClick}
-        onCellChange={handleCellChange}
-      />
-      
-      <StatusBar
-        activeCell={activeCell}
-        cellValue={String(activeCellValue)}
-        cellFormula={activeCellFormula}
-        sheetName={activeSheet.name}
-        isEditing={isEditing}
-        lastSaved={lastSaved}
-      />
-      
-      <AIPanel
-        isOpen={isAIPanelOpen}
-        onClose={() => setIsAIPanelOpen(false)}
-        onSendMessage={handleSendMessage}
-      />
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex-1 flex flex-col">
+          <Grid
+            sheet={activeSheet}
+            activeCell={activeCell}
+            selection={selection}
+            isEditing={isEditing}
+            onCellClick={handleCellClick}
+            onCellDoubleClick={handleCellDoubleClick}
+            onCellChange={handleCellChange}
+          />
+          
+          <StatusBar
+            activeCell={activeCell}
+            cellValue={String(activeCellValue)}
+            cellFormula={activeCellFormula}
+            sheetName={activeSheet.name}
+            isEditing={isEditing}
+            lastSaved={lastSaved}
+          />
+        </div>
+        
+        <div className="w-80">
+          <AIPanel onSendMessage={handleSendMessage} />
+        </div>
+      </div>
     </div>
   )
 }

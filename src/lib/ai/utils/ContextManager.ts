@@ -1,53 +1,61 @@
-// Context Manager class
 export class ContextManager {
-  private context: Record<string, any> = {}
-  private conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  private context: any = {}
+  private conversationHistory: Array<{ role: string; content: string }> = []
+  private maxHistoryLength: number = 10
   
-  // Set a context value
-  setContext(key: string, value: any): void {
-    this.context[key] = value
+  constructor() {
+    this.resetContext()
   }
   
-  // Get a context value
-  getContextValue(key: string): any {
-    return this.context[key]
-  }
-  
-  // Get the entire context
-  getContext(): Record<string, any> {
-    return { ...this.context }
-  }
-  
-  // Clear the context
-  clearContext(): void {
-    this.context = {}
-  }
-  
-  // Add a message to the conversation history
-  addMessage(role: 'user' | 'assistant', content: string): void {
-    this.conversationHistory.push({ role, content })
-  }
-  
-  // Get the conversation history
-  getConversationHistory(): Array<{ role: 'user' | 'assistant'; content: string }> {
-    return [...this.conversationHistory]
-  }
-  
-  // Clear the conversation history
-  clearConversationHistory(): void {
+  resetContext(): void {
+    this.context = {
+      activeSheet: null,
+      activeCell: null,
+      selection: null,
+      lastAction: null,
+      lastFormula: null,
+      lastError: null,
+      conversationHistory: []
+    }
+    
     this.conversationHistory = []
   }
   
-  // Get the conversation history as a string
-  getConversationHistoryString(): string {
-    return this.conversationHistory
-      .map(message => `${message.role}: ${message.content}`)
-      .join('\n')
+  updateContext(newContext: any): void {
+    this.context = {
+      ...this.context,
+      ...newContext
+    }
   }
   
-  // Get the recent conversation history (last n messages)
-  getRecentConversationHistory(n: number): Array<{ role: 'user' | 'assistant'; content: string }> {
-    return this.conversationHistory.slice(-n)
+  getContext(): any {
+    return {
+      ...this.context,
+      conversationHistory: [...this.conversationHistory]
+    }
+  }
+  
+  addToConversation(role: string, content: string): void {
+    this.conversationHistory.push({ role, content })
+    
+    // Limit the history length
+    if (this.conversationHistory.length > this.maxHistoryLength) {
+      this.conversationHistory = this.conversationHistory.slice(
+        this.conversationHistory.length - this.maxHistoryLength
+      )
+    }
+  }
+  
+  setLastAction(action: string): void {
+    this.context.lastAction = action
+  }
+  
+  setLastFormula(formula: string): void {
+    this.context.lastFormula = formula
+  }
+  
+  setLastError(error: string): void {
+    this.context.lastError = error
   }
 }
 

@@ -27,7 +27,6 @@ export default function Spreadsheet() {
   // State
   const [engine] = useState(() => new SpreadsheetEngine(useSpreadsheetStore.getState().workbook))
   const [aiOrchestrator] = useState(() => new AIOrchestrator())
-  const [showAIPanel, setShowAIPanel] = useState(false)
   const [showChartCreator, setShowChartCreator] = useState(false)
   const [charts, setCharts] = useState<Chart[]>([])
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
@@ -260,11 +259,6 @@ export default function Spreadsheet() {
     exportWorkbook(workbook)
   }, [workbook])
   
-  // Toggle AI panel
-  const toggleAIPanel = useCallback(() => {
-    setShowAIPanel(prev => !prev)
-  }, [])
-  
   // Toggle theme
   const toggleTheme = useCallback(() => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light')
@@ -437,7 +431,6 @@ export default function Spreadsheet() {
         onRedo={redo}
         canUndo={canUndo}
         canRedo={canRedo}
-        onAIAssistant={toggleAIPanel}
         onFormatChange={handleCellFormatChange}
         currentFormat={activeCellFormat}
         onCreateChart={openChartCreator}
@@ -446,6 +439,7 @@ export default function Spreadsheet() {
       />
       
       <div className="flex flex-1 overflow-hidden">
+        {/* Main content area */}
         <div className="flex-1 flex flex-col relative">
           <Grid
             sheet={activeSheet}
@@ -482,14 +476,13 @@ export default function Spreadsheet() {
           />
         </div>
         
-        {showAIPanel && (
-          <div className="w-80">
-            <AIPanel 
-              onSendMessage={handleSendMessage} 
-              onClearMemory={handleClearAIMemory}
-            />
-          </div>
-        )}
+        {/* AI Assistant panel - always visible on the right side */}
+        <div className="w-80 border-l">
+          <AIPanel 
+            onSendMessage={handleSendMessage} 
+            onClearMemory={handleClearAIMemory}
+          />
+        </div>
       </div>
       
       {/* Chart Creator Dialog */}

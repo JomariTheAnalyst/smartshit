@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Send, Sparkles, Lightbulb, Trash2 } from 'lucide-react'
+import { Send, Sparkles, Lightbulb, Trash2, Info } from 'lucide-react'
 import AIActionVerification from '@/components/ai/AIActionVerification'
 import { AIAction } from '@/types/ai'
 
@@ -25,41 +25,17 @@ export default function AIPanel({ onSendMessage, onClearMemory }: AIAssistantPro
     {
       id: 'welcome',
       role: 'system',
-      content: 'Welcome to the AI Assistant! I can help you with:',
+      content: 'New Chat',
       timestamp: new Date()
     },
     {
-      id: 'welcome-1',
+      id: 'tip',
       role: 'system',
-      content: '• Creating formulas from descriptions',
+      content: 'Tip: Ask Shortcut to do your work for you. Most tasks take 1-15 minutes to complete. All changes can be reverted.',
       timestamp: new Date()
     },
     {
-      id: 'welcome-2',
-      role: 'system',
-      content: '• Cleaning and transforming data',
-      timestamp: new Date()
-    },
-    {
-      id: 'welcome-3',
-      role: 'system',
-      content: '• Creating charts and visualizations',
-      timestamp: new Date()
-    },
-    {
-      id: 'welcome-4',
-      role: 'system',
-      content: '• Analyzing data and providing insights',
-      timestamp: new Date()
-    },
-    {
-      id: 'welcome-5',
-      role: 'system',
-      content: '• Importing and exporting data',
-      timestamp: new Date()
-    },
-    {
-      id: 'welcome-6',
+      id: 'welcome-assistant',
       role: 'assistant',
       content: 'How can I help you today?',
       timestamp: new Date()
@@ -199,7 +175,13 @@ export default function AIPanel({ onSendMessage, onClearMemory }: AIAssistantPro
       {
         id: 'clear',
         role: 'system',
-        content: 'Memory cleared. I\'ve forgotten our previous conversation.',
+        content: 'New Chat',
+        timestamp: new Date()
+      },
+      {
+        id: 'tip',
+        role: 'system',
+        content: 'Tip: Ask Shortcut to do your work for you. Most tasks take 1-15 minutes to complete. All changes can be reverted.',
         timestamp: new Date()
       },
       {
@@ -275,22 +257,34 @@ export default function AIPanel({ onSendMessage, onClearMemory }: AIAssistantPro
   }
   
   return (
-    <div className="ai-panel flex flex-col h-full border-l">
+    <div className="ai-panel flex flex-col h-full">
+      {/* Header */}
       <div className="ai-panel-header p-3 border-b flex items-center justify-between bg-gray-50">
         <div className="flex items-center">
-          <Sparkles className="h-5 w-5 text-blue-500 mr-2" />
-          <h3 className="font-medium">AI Assistant</h3>
+          <h3 className="font-medium text-green-600">New Chat</h3>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleClearMemory}
-          title="Clear memory"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClearMemory}
+            title="Clear memory"
+            className="h-8 w-8 p-0"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            title="Your AI Preferences"
+            className="h-8 w-8 p-0"
+          >
+            <Info className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
       
+      {/* Messages */}
       <div className="ai-panel-messages flex-1 overflow-y-auto p-3 space-y-4">
         {messages.map(message => (
           <div
@@ -308,7 +302,7 @@ export default function AIPanel({ onSendMessage, onClearMemory }: AIAssistantPro
                 message.role === 'user'
                   ? 'bg-blue-500 text-white ml-auto'
                   : message.role === 'system'
-                  ? 'bg-gray-200 text-gray-800 text-sm italic'
+                  ? 'bg-gray-100 text-gray-600 text-sm italic'
                   : 'bg-gray-100 text-gray-800'
               }`}
             >
@@ -356,20 +350,22 @@ export default function AIPanel({ onSendMessage, onClearMemory }: AIAssistantPro
               </div>
             )}
             
-            <div
-              className={`text-xs text-gray-500 mt-1 ${
-                message.role === 'user' ? 'text-right' : 'text-left'
-              }`}
-            >
-              {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </div>
+            {message.role !== 'system' && (
+              <div
+                className={`text-xs text-gray-500 mt-1 ${
+                  message.role === 'user' ? 'text-right' : 'text-left'
+                }`}
+              >
+                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            )}
           </div>
         ))}
         <div ref={messagesEndRef} />
       </div>
       
       {/* Suggested prompts */}
-      {messages.length <= 8 && (
+      {messages.length <= 5 && (
         <div className="px-3 py-2 border-t">
           <p className="text-xs text-gray-500 mb-2">Try asking:</p>
           <div className="flex flex-wrap gap-2">
@@ -387,21 +383,22 @@ export default function AIPanel({ onSendMessage, onClearMemory }: AIAssistantPro
         </div>
       )}
       
+      {/* Input */}
       <div className="ai-panel-input p-3 border-t">
-        <div className="flex items-center">
+        <div className="flex items-center bg-gray-100 rounded-md p-1">
           <Input
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Ask the AI assistant..."
+            placeholder="Type your message here..."
             disabled={isLoading}
-            className="flex-1"
+            className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
           />
           <Button
-            size="icon"
+            size="sm"
             onClick={handleSendMessage}
             disabled={isLoading || !input.trim()}
-            className="ml-2"
+            className="ml-1 bg-green-600 hover:bg-green-700 text-white"
           >
             <Send className="h-4 w-4" />
           </Button>
@@ -409,6 +406,7 @@ export default function AIPanel({ onSendMessage, onClearMemory }: AIAssistantPro
         {isLoading && <p className="text-xs text-gray-500 mt-1">AI is thinking...</p>}
       </div>
       
+      {/* Action verification dialog */}
       <AIActionVerification
         action={pendingAction}
         isOpen={isVerificationOpen}

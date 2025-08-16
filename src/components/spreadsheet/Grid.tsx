@@ -1,28 +1,20 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
-import { FixedSizeGrid } from 'react-window'
-import AutoSizer from 'react-virtualized-auto-sizer'
+import { useCallback, useRef, useEffect } from 'react'
 import Cell from './Cell'
-import HeaderRow from './HeaderRow'
-import HeaderColumn from './HeaderColumn'
-import { colIndexToLetter } from '@/lib/utils'
-import { ISheet } from '@/types/spreadsheet'
+import { Sheet, ActiveCell, Selection, CellDragEvent } from '@/types/spreadsheet'
+import { useDragAndDrop } from '@/hooks/useDragAndDrop'
+import { formatCellReference, columnIndexToLetter } from '@/lib/utils'
 
 interface GridProps {
-  sheet: ISheet
-  activeCell: { row: number; col: number } | null
-  selection: {
-    startRow: number
-    startCol: number
-    endRow: number
-    endCol: number
-    type: 'cell' | 'row' | 'column' | 'range'
-  } | null
+  sheet: Sheet
+  activeCell: ActiveCell | null
+  selection: Selection | null
   isEditing: boolean
   onCellClick: (row: number, col: number) => void
   onCellDoubleClick: (row: number, col: number) => void
   onCellChange: (row: number, col: number, value: string) => void
+  onCellDrag?: (event: CellDragEvent) => void
 }
 
 export default function Grid({
@@ -32,135 +24,193 @@ export default function Grid({
   isEditing,
   onCellClick,
   onCellDoubleClick,
-  onCellChange
+  onCellChange,
+  onCellDrag
 }: GridProps) {
-  // Default cell dimensions
-  const [columnWidth, setColumnWidth] = useState(100)
-  const [rowHeight, setRowHeight] = useState(25)
+  const gridRef = useRef<HTMLDivElement>(null)
   
-  // Header dimensions
-  const headerColumnWidth = 50
-  const headerRowHeight = 25
+  // Drag and drop
+  const { 
+    isDragging, 
+    handleDragStart, 
+    handleDragOver, 
+    handleDragEnd, 
+    handleDragCancel,
+    getDragSelection
+  } = useDragAndDrop({
+    onDragComplete: (event) => {
+      if (onCellDrag) {
+        onCellDrag(event)
+      }
+    }
+  })
   
-  // Refs for scrolling
-  const gridRef = useRef<any>(null)
-  
-  // Get a cell value
-  const getCellValue = useCallback((row: number, col: number) => {
-    const cellKey = `${colIndexToLetter(col)}${row + 1}`
-    const cell = sheet.cells[cellKey]
-    
-    if (!cell) {
-      return ''
+  // Handle mouse down on a cell
+  const handleMouseDown = useCallback((e: React.MouseEvent, row: number, col: number) => {
+    // Right click - don't start drag
+    if (e.button === 2) {
+      return
     }
     
-    return cell.value !== null ? String(cell.value) : ''
-  }, [sheet.cells])
+    // Start drag if shift key is pressed
+    if (e.shiftKey) {
+      handleDragStart(row, col)
+    }
+  }, [handleDragStart])
+  
+  // Handle mouse move over a cell
+  const handleMouseMove = useCallback((row: number, col: number) => {
+    handleDragOver(row, col)
+  }, [handleDragOver])
+  
+  // Handle mouse up
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    handleDragEnd(e.ctrlKey)
+  }, [handleDragEnd])
+  
+  // Handle key down
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      handleDragCancel()
+    }
+  }, [handleDragCancel])
+  
+  // Add event listeners
+  useEffect(() => {
+    const handleGlobalMouseUp = (e: MouseEvent) => {
+      handleDragEnd((e as MouseEvent).ctrlKey)
+    }
+    
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleDragCancel()
+      }
+    }
+    
+    document.addEventListener('mouseup', handleGlobalMouseUp)
+    document.addEventListener('keydown', handleGlobalKeyDown)
+    
+    return () => {
+      document.removeEventListener('mouseup', handleGlobalMouseUp)
+      document.removeEventListener('keydown', handleGlobalKeyDown)
+    }
+  }, [handleDragEnd, handleDragCancel])
   
   // Check if a cell is selected
   const isCellSelected = useCallback((row: number, col: number) => {
-    if (!selection) return false
-    
-    const { startRow, startCol, endRow, endCol, type } = selection
-    
-    // Normalize the selection coordinates
-    const minRow = Math.min(startRow, endRow)
-    const maxRow = Math.max(startRow, endRow)
-    const minCol = Math.min(startCol, endCol)
-    const maxCol = Math.max(startCol, endCol)
-    
-    if (type === 'cell' || type === 'range') {
-      return row >= minRow && row <= maxRow && col >= minCol && col <= maxCol
-    } else if (type === 'row') {
-      return row >= minRow && row <= maxRow
-    } else if (type === 'column') {
-      return col >= minCol && col <= maxCol
+    if (!selection) {
+      return false
     }
     
-    return false
+    return (
+      row >= selection.startRow &&
+      row <= selection.endRow &&
+      col >= selection.startCol &&
+      col <= selection.endCol
+    )
   }, [selection])
   
   // Check if a cell is the active cell
-  const isActiveCell = useCallback((row: number, col: number) => {
-    if (!activeCell) return false
+  const isActiveCellFn = useCallback((row: number, col: number) => {
+    if (!activeCell) {
+      return false
+    }
     
     return activeCell.row === row && activeCell.col === col
   }, [activeCell])
   
-  // Render a cell
-  const renderCell = useCallback(({ columnIndex, rowIndex, style }) => {
+  // Check if a cell is being dragged
+  const isCellDragged = useCallback((row: number, col: number) => {
+    const dragSelection = getDragSelection()
+    
+    if (!dragSelection) {
+      return false
+    }
+    
     return (
-      <Cell
-        row={rowIndex}
-        col={columnIndex}
-        value={getCellValue(rowIndex, columnIndex)}
-        isSelected={isCellSelected(rowIndex, columnIndex)}
-        isActive={isActiveCell(rowIndex, columnIndex)}
-        isEditing={isEditing && isActiveCell(rowIndex, columnIndex)}
-        onClick={() => onCellClick(rowIndex, columnIndex)}
-        onDoubleClick={() => onCellDoubleClick(rowIndex, columnIndex)}
-        onChange={(value) => onCellChange(rowIndex, columnIndex, value)}
-        style={style}
-      />
+      row >= dragSelection.startRow &&
+      row <= dragSelection.endRow &&
+      col >= dragSelection.startCol &&
+      col <= dragSelection.endCol
     )
-  }, [
-    getCellValue,
-    isCellSelected,
-    isActiveCell,
-    isEditing,
-    onCellClick,
-    onCellDoubleClick,
-    onCellChange
-  ])
+  }, [getDragSelection])
+  
+  // Generate column headers
+  const columnHeaders = []
+  for (let col = 0; col < sheet.columnCount; col++) {
+    columnHeaders.push(
+      <div key={`header-${col}`} className="column-header bg-gray-100 border border-gray-200 p-1 text-center">
+        {columnIndexToLetter(col)}
+      </div>
+    )
+  }
+  
+  // Generate row headers and cells
+  const rows = []
+  for (let row = 0; row < sheet.rowCount; row++) {
+    const cells = []
+    
+    // Row header
+    cells.push(
+      <div key={`header-${row}`} className="row-header bg-gray-100 border border-gray-200 p-1 text-center">
+        {row + 1}
+      </div>
+    )
+    
+    // Cells
+    for (let col = 0; col < sheet.columnCount; col++) {
+      const cellKey = `${row},${col}`
+      const cell = sheet.cells[cellKey] || null
+      
+      cells.push(
+        <div
+          key={cellKey}
+          className="cell-container"
+          onMouseDown={(e) => handleMouseDown(e, row, col)}
+          onMouseMove={() => handleMouseMove(row, col)}
+        >
+          <Cell
+            cell={cell}
+            isActiveCell={isActiveCellFn(row, col)}
+            isSelected={isCellSelected(row, col) || isCellDragged(row, col)}
+            isEditing={isEditing && isActiveCellFn(row, col)}
+            onCellClick={() => onCellClick(row, col)}
+            onCellDoubleClick={() => onCellDoubleClick(row, col)}
+            onCellChange={onCellChange}
+            row={row}
+            col={col}
+          />
+        </div>
+      )
+    }
+    
+    rows.push(
+      <div key={`row-${row}`} className="grid-row flex">
+        {cells}
+      </div>
+    )
+  }
   
   return (
-    <div className="grid-container relative flex-1">
-      <div
-        className="header-row absolute top-0 left-0 z-10"
-        style={{ left: headerColumnWidth, right: 0, height: headerRowHeight }}
-      >
-        <HeaderRow
-          columnCount={sheet.columnCount}
-          columnWidth={columnWidth}
-          height={headerRowHeight}
-        />
-      </div>
-      
-      <div
-        className="header-column absolute top-0 left-0 z-10"
-        style={{ top: headerRowHeight, bottom: 0, width: headerColumnWidth }}
-      >
-        <HeaderColumn
-          rowCount={sheet.rowCount}
-          rowHeight={rowHeight}
-          width={headerColumnWidth}
-        />
-      </div>
-      
-      <div
-        className="grid-content absolute"
-        style={{
-          top: headerRowHeight,
-          left: headerColumnWidth,
-          right: 0,
-          bottom: 0
-        }}
-      >
-        <AutoSizer>
-          {({ height, width }) => (
-            <FixedSizeGrid
-              ref={gridRef}
-              columnCount={sheet.columnCount}
-              columnWidth={columnWidth}
-              height={height}
-              rowCount={sheet.rowCount}
-              rowHeight={rowHeight}
-              width={width}
-            >
-              {renderCell}
-            </FixedSizeGrid>
-          )}
-        </AutoSizer>
+    <div 
+      ref={gridRef}
+      className="grid-container flex-1 overflow-auto"
+      onMouseUp={handleMouseUp}
+    >
+      <div className="grid">
+        {/* Corner */}
+        <div className="grid-corner bg-gray-100 border border-gray-200"></div>
+        
+        {/* Column headers */}
+        <div className="column-headers flex">
+          <div className="grid-corner bg-gray-100 border border-gray-200"></div>
+          {columnHeaders}
+        </div>
+        
+        {/* Rows */}
+        <div className="rows">
+          {rows}
+        </div>
       </div>
     </div>
   )

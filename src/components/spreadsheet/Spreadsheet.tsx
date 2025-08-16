@@ -5,6 +5,8 @@ import RibbonToolbar from '@/components/layout/RibbonToolbar'
 import StatusBar from '@/components/layout/StatusBar'
 import AIPanel from '@/components/layout/AIPanel'
 import Grid from '@/components/spreadsheet/Grid'
+import ChartCreator from '@/components/charts/ChartCreator'
+import ChartView from '@/components/charts/ChartView'
 import { useSpreadsheetStore } from '@/store/spreadsheetStore'
 import { useUndoRedo } from '@/hooks/useUndoRedo'
 import { useSelection } from '@/hooks/useSelection'
@@ -14,13 +16,19 @@ import { useFileImport } from '@/hooks/useFileImport'
 import { SpreadsheetEngine } from '@/lib/spreadsheet/SpreadsheetEngine'
 import { AIOrchestrator } from '@/lib/ai/AIOrchestrator'
 import { SetCellValueCommand } from '@/lib/commands/CellCommands'
+import { SetCellFormatCommand } from '@/lib/commands/FormatCommands'
+import { MoveCellCommand, CopyCellCommand, MoveRangeCommand, CopyRangeCommand } from '@/lib/commands/DragCommands'
 import { exportWorkbook } from '@/lib/io/xlsx'
 import { formatCellReference } from '@/lib/utils'
+import { CellFormat, CellDragEvent, ChartOptions, Chart } from '@/types/spreadsheet'
 
 export default function Spreadsheet() {
   // State
   const [engine] = useState(() => new SpreadsheetEngine(useSpreadsheetStore.getState().workbook))
   const [aiOrchestrator] = useState(() => new AIOrchestrator())
+  const [showAIPanel, setShowAIPanel] = useState(false)
+  const [showChartCreator, setShowChartCreator] = useState(false)
+  const [charts, setCharts] = useState<Chart[]>([])
   
   // Hooks
   const {
@@ -80,6 +88,90 @@ export default function Spreadsheet() {
     execute(command)
     stopEditing()
   }, [engine, workbook.activeSheetIndex, execute, stopEditing])
+  
+  // Handle cell format change
+  const handleCellFormatChange = useCallback((format: Partial<CellFormat>) => {
+    if (!activeCell) return
+    
+    const command = new SetCellFormatCommand(
+      engine,
+      workbook.activeSheetIndex,
+      activeCell.row,
+      activeCell.col,
+      format
+    )
+    execute(command)
+  }, [engine, workbook.activeSheetIndex, activeCell, execute])
+  
+  // Handle cell drag
+  const handleCellDrag = useCallback((event: CellDragEvent) => {
+    const { sourceRow, sourceCol, targetRow, targetCol, isCopy } = event
+    
+    // If source and target are the same, do nothing
+    if (sourceRow === targetRow && sourceCol === targetCol) {
+      return
+    }
+    
+    // Check if we're dragging a single cell or a range
+    if (selection && 
+        selection.startRow === selection.endRow && 
+        selection.startCol === selection.endCol &&
+        selection.startRow === sourceRow && 
+        selection.startCol === sourceCol) {
+      // Single cell drag
+      if (isCopy) {
+        const command = new CopyCellCommand(
+          engine,
+          workbook.activeSheetIndex,
+          sourceRow,
+          sourceCol,
+          targetRow,
+          targetCol
+        )
+        execute(command)
+      } else {
+        const command = new MoveCellCommand(
+          engine,
+          workbook.activeSheetIndex,
+          sourceRow,
+          sourceCol,
+          targetRow,
+          targetCol
+        )
+        execute(command)
+      }
+    } else if (selection) {
+      // Range drag
+      const rowOffset = targetRow - sourceRow
+      const colOffset = targetCol - sourceCol
+      
+      if (isCopy) {
+        const command = new CopyRangeCommand(
+          engine,
+          workbook.activeSheetIndex,
+          selection.startRow,
+          selection.startCol,
+          selection.endRow,
+          selection.endCol,
+          selection.startRow + rowOffset,
+          selection.startCol + colOffset
+        )
+        execute(command)
+      } else {
+        const command = new MoveRangeCommand(
+          engine,
+          workbook.activeSheetIndex,
+          selection.startRow,
+          selection.startCol,
+          selection.endRow,
+          selection.endCol,
+          selection.startRow + rowOffset,
+          selection.startCol + colOffset
+        )
+        execute(command)
+      }
+    }
+  }, [engine, workbook.activeSheetIndex, selection, execute])
   
   // Handle keyboard navigation
   useKeyboardNavigation({
@@ -166,6 +258,56 @@ export default function Spreadsheet() {
     exportWorkbook(workbook)
   }, [workbook])
   
+  // Toggle AI panel
+  const toggleAIPanel = useCallback(() => {
+    setShowAIPanel(prev => !prev)
+  }, [])
+  
+  // Open chart creator
+  const openChartCreator = useCallback(() => {
+    setShowChartCreator(true)
+  }, [])
+  
+  // Handle chart creation
+  const handleCreateChart = useCallback((options: ChartOptions) => {
+    const newChart: Chart = {
+      id: `chart-${Date.now()}`,
+      sheetIndex: workbook.activeSheetIndex,
+      options,
+      position: {
+        top: 100,
+        left: 100,
+        width: 400,
+        height: 300
+      }
+    }
+    
+    setCharts(prev => [...prev, newChart])
+  }, [workbook.activeSheetIndex])
+  
+  // Handle chart removal
+  const handleRemoveChart = useCallback((chartId: string) => {
+    setCharts(prev => prev.filter(chart => chart.id !== chartId))
+  }, [])
+  
+  // Handle chart position change
+  const handleChartPositionChange = useCallback((chartId: string, position: { top: number; left: number }) => {
+    setCharts(prev => prev.map(chart => 
+      chart.id === chartId
+        ? { ...chart, position: { ...chart.position, ...position } }
+        : chart
+    ))
+  }, [])
+  
+  // Handle chart resize
+  const handleChartResize = useCallback((chartId: string, size: { width: number; height: number }) => {
+    setCharts(prev => prev.map(chart => 
+      chart.id === chartId
+        ? { ...chart, position: { ...chart.position, ...size } }
+        : chart
+    ))
+  }, [])
+  
   // Handle sending a message to the AI assistant
   const handleSendMessage = useCallback(async (message: string) => {
     // Get the current context
@@ -193,6 +335,24 @@ export default function Spreadsheet() {
     ? engine.getCellByPosition(workbook.activeSheetIndex, activeCell.row, activeCell.col)?.value as string
     : null
   
+  // Get the active cell format
+  const activeCellFormat = activeCell
+    ? engine.getCellByPosition(workbook.activeSheetIndex, activeCell.row, activeCell.col)?.format || {}
+    : {}
+  
+  // Get the sheet data for charts
+  const sheetData = Object.entries(activeSheet.cells).reduce((data, [key, cell]) => {
+    const [row, col] = key.split(',').map(Number)
+    
+    if (!data[row]) {
+      data[row] = []
+    }
+    
+    data[row][col] = cell.displayValue
+    
+    return data
+  }, [] as any[][])
+  
   return (
     <div className="spreadsheet-container flex flex-col h-screen">
       <RibbonToolbar
@@ -203,11 +363,14 @@ export default function Spreadsheet() {
         onRedo={redo}
         canUndo={canUndo}
         canRedo={canRedo}
-        onAIAssistant={() => {}}
+        onAIAssistant={toggleAIPanel}
+        onFormatChange={handleCellFormatChange}
+        currentFormat={activeCellFormat}
+        onCreateChart={openChartCreator}
       />
       
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col relative">
           <Grid
             sheet={activeSheet}
             activeCell={activeCell}
@@ -216,7 +379,22 @@ export default function Spreadsheet() {
             onCellClick={handleCellClick}
             onCellDoubleClick={handleCellDoubleClick}
             onCellChange={handleCellChange}
+            onCellDrag={handleCellDrag}
           />
+          
+          {/* Charts */}
+          {charts
+            .filter(chart => chart.sheetIndex === workbook.activeSheetIndex)
+            .map(chart => (
+              <ChartView
+                key={chart.id}
+                chart={chart}
+                data={sheetData}
+                onRemove={handleRemoveChart}
+                onPositionChange={handleChartPositionChange}
+                onResize={handleChartResize}
+              />
+            ))}
           
           <StatusBar
             activeCell={activeCell}
@@ -228,10 +406,21 @@ export default function Spreadsheet() {
           />
         </div>
         
-        <div className="w-80">
-          <AIPanel onSendMessage={handleSendMessage} />
-        </div>
+        {showAIPanel && (
+          <div className="w-80">
+            <AIPanel onSendMessage={handleSendMessage} />
+          </div>
+        )}
       </div>
+      
+      {/* Chart Creator Dialog */}
+      <ChartCreator
+        isOpen={showChartCreator}
+        onClose={() => setShowChartCreator(false)}
+        onCreateChart={handleCreateChart}
+        data={sheetData}
+        selection={selection}
+      />
     </div>
   )
 }

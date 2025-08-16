@@ -1,31 +1,23 @@
 'use client'
 
 import { useState } from 'react'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { Button } from '@/components/ui/Button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
+import FormatToolbar from './FormatToolbar'
+import { CellFormat } from '@/types/spreadsheet'
 import { 
-  Bold, 
-  Italic, 
-  Underline, 
-  AlignLeft, 
-  AlignCenter, 
-  AlignRight, 
-  AlignJustify,
-  Save,
-  FileUp,
-  FileDown,
-  Plus,
-  Trash,
-  Copy,
-  Clipboard,
-  Scissors,
-  Undo,
-  Redo,
-  BarChart,
-  LineChart,
-  PieChart,
-  Table,
-  Wand2
+  Save, 
+  Upload, 
+  Download, 
+  Undo2, 
+  Redo2, 
+  Copy, 
+  Scissors, 
+  Clipboard, 
+  Table, 
+  ChartBar, 
+  Function, 
+  Wand2 
 } from 'lucide-react'
 
 interface RibbonToolbarProps {
@@ -34,9 +26,12 @@ interface RibbonToolbarProps {
   onExport: () => void
   onUndo: () => void
   onRedo: () => void
+  onAIAssistant: () => void
   canUndo: boolean
   canRedo: boolean
-  onAIAssistant: () => void
+  onFormatChange?: (format: Partial<CellFormat>) => void
+  currentFormat?: Partial<CellFormat>
+  onCreateChart?: () => void
 }
 
 export default function RibbonToolbar({
@@ -45,183 +40,232 @@ export default function RibbonToolbar({
   onExport,
   onUndo,
   onRedo,
+  onAIAssistant,
   canUndo,
   canRedo,
-  onAIAssistant
+  onFormatChange,
+  currentFormat = {},
+  onCreateChart
 }: RibbonToolbarProps) {
   const [activeTab, setActiveTab] = useState('home')
   
   return (
     <div className="ribbon-toolbar border-b">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-background border-b">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="bg-gray-100">
           <TabsTrigger value="home">Home</TabsTrigger>
           <TabsTrigger value="insert">Insert</TabsTrigger>
+          <TabsTrigger value="page-layout">Page Layout</TabsTrigger>
           <TabsTrigger value="formulas">Formulas</TabsTrigger>
           <TabsTrigger value="data">Data</TabsTrigger>
           <TabsTrigger value="view">View</TabsTrigger>
-          <TabsTrigger value="ai">AI Assistant</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="home" className="p-2 flex flex-wrap gap-2 items-center">
-          <div className="flex flex-col items-center px-2 border-r">
-            <Button variant="ghost" size="sm" onClick={onSave}>
-              <Save className="h-4 w-4 mr-1" />
-              Save
-            </Button>
-          </div>
-          
-          <div className="flex flex-col items-center px-2 border-r">
-            <Button variant="ghost" size="sm" onClick={onUndo} disabled={!canUndo}>
-              <Undo className="h-4 w-4 mr-1" />
-              Undo
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onRedo} disabled={!canRedo}>
-              <Redo className="h-4 w-4 mr-1" />
-              Redo
-            </Button>
-          </div>
-          
-          <div className="flex flex-col items-center px-2 border-r">
-            <div className="flex">
-              <Button variant="ghost" size="sm">
-                <Copy className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm">
-                <Clipboard className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm">
-                <Scissors className="h-4 w-4" />
-              </Button>
+        <div className="p-1">
+          {activeTab === 'home' && (
+            <div className="flex items-center space-x-4">
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm" onClick={onSave}>
+                  <Save className="h-4 w-4 mr-1" />
+                  <span className="text-xs">Save</span>
+                </Button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <div className="flex">
+                  <Button variant="ghost" size="sm" onClick={onImport}>
+                    <Upload className="h-4 w-4 mr-1" />
+                    <span className="text-xs">Import</span>
+                  </Button>
+                  
+                  <Button variant="ghost" size="sm" onClick={onExport}>
+                    <Download className="h-4 w-4 mr-1" />
+                    <span className="text-xs">Export</span>
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <div className="flex">
+                  <Button variant="ghost" size="sm" onClick={onUndo} disabled={!canUndo}>
+                    <Undo2 className="h-4 w-4 mr-1" />
+                    <span className="text-xs">Undo</span>
+                  </Button>
+                  
+                  <Button variant="ghost" size="sm" onClick={onRedo} disabled={!canRedo}>
+                    <Redo2 className="h-4 w-4 mr-1" />
+                    <span className="text-xs">Redo</span>
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <div className="flex">
+                  <Button variant="ghost" size="sm">
+                    <Copy className="h-4 w-4 mr-1" />
+                    <span className="text-xs">Copy</span>
+                  </Button>
+                  
+                  <Button variant="ghost" size="sm">
+                    <Scissors className="h-4 w-4 mr-1" />
+                    <span className="text-xs">Cut</span>
+                  </Button>
+                  
+                  <Button variant="ghost" size="sm">
+                    <Clipboard className="h-4 w-4 mr-1" />
+                    <span className="text-xs">Paste</span>
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="h-10 border-l border-gray-300 mx-1"></div>
+              
+              {onFormatChange && (
+                <FormatToolbar 
+                  onFormatChange={onFormatChange} 
+                  currentFormat={currentFormat} 
+                />
+              )}
+              
+              <div className="h-10 border-l border-gray-300 mx-1"></div>
+              
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm" onClick={onAIAssistant}>
+                  <Wand2 className="h-4 w-4 mr-1" />
+                  <span className="text-xs">AI Assistant</span>
+                </Button>
+              </div>
             </div>
-            <span className="text-xs">Clipboard</span>
-          </div>
+          )}
           
-          <div className="flex flex-col items-center px-2 border-r">
-            <div className="flex">
-              <Button variant="ghost" size="sm">
-                <Bold className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm">
-                <Italic className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm">
-                <Underline className="h-4 w-4" />
-              </Button>
+          {activeTab === 'insert' && (
+            <div className="flex items-center space-x-4">
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <Table className="h-4 w-4 mr-1" />
+                  <span className="text-xs">Table</span>
+                </Button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm" onClick={onCreateChart}>
+                  <ChartBar className="h-4 w-4 mr-1" />
+                  <span className="text-xs">Chart</span>
+                </Button>
+              </div>
             </div>
-            <span className="text-xs">Font</span>
-          </div>
+          )}
           
-          <div className="flex flex-col items-center px-2 border-r">
-            <div className="flex">
-              <Button variant="ghost" size="sm">
-                <AlignLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm">
-                <AlignCenter className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm">
-                <AlignRight className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm">
-                <AlignJustify className="h-4 w-4" />
-              </Button>
+          {activeTab === 'formulas' && (
+            <div className="flex items-center space-x-4">
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <Function className="h-4 w-4 mr-1" />
+                  <span className="text-xs">Insert Function</span>
+                </Button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <span className="text-xs">SUM</span>
+                </Button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <span className="text-xs">AVERAGE</span>
+                </Button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <span className="text-xs">COUNT</span>
+                </Button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <span className="text-xs">MAX</span>
+                </Button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <span className="text-xs">MIN</span>
+                </Button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <span className="text-xs">IF</span>
+                </Button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <span className="text-xs">VLOOKUP</span>
+                </Button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <span className="text-xs">XLOOKUP</span>
+                </Button>
+              </div>
             </div>
-            <span className="text-xs">Alignment</span>
-          </div>
+          )}
           
-          <div className="flex flex-col items-center px-2">
-            <Button variant="ghost" size="sm" onClick={onImport}>
-              <FileUp className="h-4 w-4 mr-1" />
-              Import
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onExport}>
-              <FileDown className="h-4 w-4 mr-1" />
-              Export
-            </Button>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="insert" className="p-2 flex flex-wrap gap-2 items-center">
-          <div className="flex flex-col items-center px-2 border-r">
-            <div className="flex">
-              <Button variant="ghost" size="sm">
-                <Table className="h-4 w-4 mr-1" />
-                Table
-              </Button>
+          {activeTab === 'data' && (
+            <div className="flex items-center space-x-4">
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <span className="text-xs">Sort</span>
+                </Button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <span className="text-xs">Filter</span>
+                </Button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <span className="text-xs">Data Validation</span>
+                </Button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <span className="text-xs">Remove Duplicates</span>
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
           
-          <div className="flex flex-col items-center px-2 border-r">
-            <div className="flex">
-              <Button variant="ghost" size="sm">
-                <BarChart className="h-4 w-4 mr-1" />
-                Bar
-              </Button>
-              <Button variant="ghost" size="sm">
-                <LineChart className="h-4 w-4 mr-1" />
-                Line
-              </Button>
-              <Button variant="ghost" size="sm">
-                <PieChart className="h-4 w-4 mr-1" />
-                Pie
-              </Button>
+          {activeTab === 'view' && (
+            <div className="flex items-center space-x-4">
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <span className="text-xs">Freeze Panes</span>
+                </Button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <span className="text-xs">Hide Gridlines</span>
+                </Button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <Button variant="ghost" size="sm">
+                  <span className="text-xs">Hide Headers</span>
+                </Button>
+              </div>
             </div>
-            <span className="text-xs">Charts</span>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="formulas" className="p-2 flex flex-wrap gap-2 items-center">
-          <div className="flex flex-col items-center px-2 border-r">
-            <Button variant="ghost" size="sm">
-              <Plus className="h-4 w-4 mr-1" />
-              Insert Function
-            </Button>
-          </div>
-          
-          <div className="flex flex-col items-center px-2">
-            <div className="flex gap-1">
-              <Button variant="ghost" size="sm">SUM</Button>
-              <Button variant="ghost" size="sm">AVERAGE</Button>
-              <Button variant="ghost" size="sm">COUNT</Button>
-              <Button variant="ghost" size="sm">MAX</Button>
-              <Button variant="ghost" size="sm">MIN</Button>
-            </div>
-            <span className="text-xs">Common Functions</span>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="data" className="p-2 flex flex-wrap gap-2 items-center">
-          <div className="flex flex-col items-center px-2 border-r">
-            <Button variant="ghost" size="sm">
-              <Trash className="h-4 w-4 mr-1" />
-              Remove Duplicates
-            </Button>
-          </div>
-          
-          <div className="flex flex-col items-center px-2">
-            <Button variant="ghost" size="sm">
-              Data Validation
-            </Button>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="view" className="p-2 flex flex-wrap gap-2 items-center">
-          <div className="flex flex-col items-center px-2">
-            <Button variant="ghost" size="sm">
-              Freeze Panes
-            </Button>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="ai" className="p-2 flex flex-wrap gap-2 items-center">
-          <div className="flex flex-col items-center px-2">
-            <Button onClick={onAIAssistant}>
-              <Wand2 className="h-4 w-4 mr-1" />
-              Open AI Assistant
-            </Button>
-          </div>
-        </TabsContent>
+          )}
+        </div>
       </Tabs>
     </div>
   )

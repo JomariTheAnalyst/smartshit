@@ -2,158 +2,270 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
-import { Wand2, X, Send, Loader2, PaperPlane } from 'lucide-react'
+import { Input } from '@/components/ui/Input'
+import { Send, Sparkles } from 'lucide-react'
+import AIActionVerification from '@/components/ai/AIActionVerification'
+import { AIAction } from '@/types/ai'
 
-interface AIPanelProps {
+interface Message {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: Date
+  actions?: AIAction[]
+}
+
+interface AIAssistantProps {
   onSendMessage: (message: string) => Promise<string>
 }
 
-export default function AIPanel({
-  onSendMessage
-}: AIPanelProps) {
-  const [message, setMessage] = useState('')
-  const [conversation, setConversation] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([])
+export default function AIPanel({ onSendMessage }: AIAssistantProps) {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      role: 'assistant',
+      content: 'Hello! I\'m your AI assistant. How can I help you with your spreadsheet today?',
+      timestamp: new Date()
+    }
+  ])
+  
+  const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
   
-  // Scroll to the bottom of the conversation
-  const scrollToBottom = () => {
+  // For action verification
+  const [pendingAction, setPendingAction] = useState<AIAction | null>(null)
+  const [isVerificationOpen, setIsVerificationOpen] = useState(false)
+  
+  // Scroll to bottom when messages change
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+  
+  // Handle input change
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value)
   }
   
-  // Focus the input when the panel opens
-  useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
-  
-  // Scroll to the bottom when the conversation changes
-  useEffect(() => {
-    scrollToBottom()
-  }, [conversation])
-  
-  // Handle sending a message
+  // Handle send message
   const handleSendMessage = async () => {
-    if (!message.trim() || isLoading) return
+    if (!input.trim() || isLoading) return
     
-    // Add the user message to the conversation
-    const userMessage = message.trim()
-    setConversation(prev => [...prev, { role: 'user', content: userMessage }])
-    setMessage('')
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: input,
+      timestamp: new Date()
+    }
+    
+    setMessages(prev => [...prev, userMessage])
+    setInput('')
     setIsLoading(true)
     
     try {
-      // Get the assistant's response
-      const response = await onSendMessage(userMessage)
+      const response = await onSendMessage(input)
       
-      // Add the assistant's response to the conversation
-      setConversation(prev => [...prev, { role: 'assistant', content: response }])
-    } catch (error) {
-      console.error('Error sending message:', error)
+      // In a real implementation, the AI might return actions that require verification
+      // For demonstration purposes, let's simulate an action that requires verification
+      // about 30% of the time
+      const shouldRequireVerification = Math.random() < 0.3
       
-      // Add an error message to the conversation
-      setConversation(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: 'Sorry, I encountered an error while processing your request. Please try again.'
+      if (shouldRequireVerification) {
+        const action: AIAction = {
+          type: 'formula_suggestion',
+          description: 'Add a formula to calculate the sum of the selected range',
+          parameters: {
+            formula: '=SUM(A1:B10)',
+            cell: 'C1'
+          },
+          confidence: 0.85,
+          preview: '=SUM(A1:B10) will be inserted into cell C1',
+          requiresConfirmation: true
         }
-      ])
+        
+        const assistantMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: response,
+          timestamp: new Date(),
+          actions: [action]
+        }
+        
+        setMessages(prev => [...prev, assistantMessage])
+        setPendingAction(action)
+        setIsVerificationOpen(true)
+      } else {
+        const assistantMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: response,
+          timestamp: new Date()
+        }
+        
+        setMessages(prev => [...prev, assistantMessage])
+      }
+    } catch (error) {
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: 'Sorry, there was an error processing your request. Please try again.',
+        timestamp: new Date()
+      }
+      
+      setMessages(prev => [...prev, errorMessage])
     } finally {
       setIsLoading(false)
     }
   }
   
-  // Handle key press events
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
+  // Handle key down
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
       handleSendMessage()
     }
   }
   
+  // Handle action confirmation
+  const handleActionConfirm = () => {
+    setIsVerificationOpen(false)
+    
+    // In a real implementation, we would execute the action here
+    // For now, let's just add a confirmation message
+    const confirmationMessage: Message = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: 'Action confirmed! I\'ve applied the formula =SUM(A1:B10) to cell C1.',
+      timestamp: new Date()
+    }
+    
+    setMessages(prev => [...prev, confirmationMessage])
+    setPendingAction(null)
+  }
+  
+  // Handle action cancellation
+  const handleActionCancel = () => {
+    setIsVerificationOpen(false)
+    
+    // Add a cancellation message
+    const cancellationMessage: Message = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: 'Action cancelled. Is there anything else you\'d like me to help with?',
+      timestamp: new Date()
+    }
+    
+    setMessages(prev => [...prev, cancellationMessage])
+    setPendingAction(null)
+  }
+  
   return (
-    <div className="ai-panel h-full flex flex-col border-l">
-      <div className="ai-panel-header flex items-center justify-between p-2 border-b bg-muted">
+    <div className="ai-panel flex flex-col h-full border-l">
+      <div className="ai-panel-header p-3 border-b flex items-center justify-between bg-gray-50">
         <div className="flex items-center">
-          <span className="font-medium text-sm">New Chat</span>
+          <Sparkles className="h-5 w-5 text-blue-500 mr-2" />
+          <h3 className="font-medium">AI Assistant</h3>
         </div>
-        <Button variant="ghost" size="sm" className="text-xs">
-          + New Chat
-        </Button>
       </div>
       
-      <div className="ai-panel-conversation flex-1 overflow-y-auto p-3 space-y-4">
-        {conversation.length === 0 ? (
-          <div className="text-center text-muted-foreground p-4">
-            <p>How can I help you with your spreadsheet today?</p>
-            <p className="text-sm mt-2">Try asking:</p>
-            <ul className="text-sm mt-1 space-y-1">
-              <li>"Create a formula to calculate sales tax"</li>
-              <li>"Clean this data by removing duplicates"</li>
-              <li>"Create a bar chart showing monthly sales"</li>
-              <li>"Format this table with alternating row colors"</li>
-            </ul>
-          </div>
-        ) : (
-          conversation.map((msg, index) => (
+      <div className="ai-panel-messages flex-1 overflow-y-auto p-3 space-y-4">
+        {messages.map(message => (
+          <div
+            key={message.id}
+            className={`message ${
+              message.role === 'user' ? 'user-message ml-8' : 'assistant-message mr-8'
+            }`}
+          >
             <div
-              key={index}
-              className={`message ${
-                msg.role === 'user' ? 'user-message ml-4' : 'assistant-message mr-4'
+              className={`p-3 rounded-lg ${
+                message.role === 'user'
+                  ? 'bg-blue-500 text-white ml-auto'
+                  : 'bg-gray-100 text-gray-800'
               }`}
             >
-              <div
-                className={`p-2 rounded-lg text-sm ${
-                  msg.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted'
-                }`}
-              >
-                {msg.content}
-              </div>
+              <p className="whitespace-pre-wrap">{message.content}</p>
             </div>
-          ))
-        )}
-        
-        {isLoading && (
-          <div className="message assistant-message mr-4">
-            <div className="p-2 rounded-lg bg-muted flex items-center text-sm">
-              <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-              Thinking...
+            
+            {message.actions && message.actions.length > 0 && (
+              <div className="mt-2 space-y-2">
+                {message.actions.map((action, index) => (
+                  <div key={index} className="bg-blue-50 p-2 rounded border border-blue-200">
+                    <p className="text-sm font-medium">{action.description}</p>
+                    <div className="flex mt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs mr-2"
+                        onClick={() => {
+                          setPendingAction(action)
+                          setIsVerificationOpen(true)
+                        }}
+                      >
+                        Apply
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-xs"
+                        onClick={() => {
+                          // Add a message indicating the action was rejected
+                          const rejectionMessage: Message = {
+                            id: Date.now().toString(),
+                            role: 'assistant',
+                            content: 'Action rejected. Is there anything else you\'d like me to help with?',
+                            timestamp: new Date()
+                          }
+                          
+                          setMessages(prev => [...prev, rejectionMessage])
+                        }}
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <div
+              className={`text-xs text-gray-500 mt-1 ${
+                message.role === 'user' ? 'text-right' : 'text-left'
+              }`}
+            >
+              {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
-        )}
-        
+        ))}
         <div ref={messagesEndRef} />
       </div>
       
-      <div className="ai-panel-input p-2 border-t">
-        <div className="flex items-end">
-          <textarea
-            ref={inputRef}
-            className="flex-1 p-2 text-sm border rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-primary"
-            placeholder="Type your message here..."
-            rows={2}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={handleKeyPress}
+      <div className="ai-panel-input p-3 border-t">
+        <div className="flex items-center">
+          <Input
+            value={input}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask the AI assistant..."
+            disabled={isLoading}
+            className="flex-1"
           />
           <Button
-            className="ml-2 h-8 w-8 p-0"
-            size="sm"
+            size="icon"
             onClick={handleSendMessage}
-            disabled={!message.trim() || isLoading}
+            disabled={isLoading || !input.trim()}
+            className="ml-2"
           >
-            <PaperPlane className="h-4 w-4" />
+            <Send className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex justify-between text-xs text-muted-foreground mt-1">
-          <span>Make targeted edits</span>
-          <span>Prompt history</span>
-        </div>
+        {isLoading && <p className="text-xs text-gray-500 mt-1">AI is thinking...</p>}
       </div>
+      
+      <AIActionVerification
+        action={pendingAction}
+        isOpen={isVerificationOpen}
+        onConfirm={handleActionConfirm}
+        onCancel={handleActionCancel}
+      />
     </div>
   )
 }

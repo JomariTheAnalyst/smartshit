@@ -103,3 +103,11 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [Chart.js](https://www.chartjs.org/)
 - [react-window](https://github.com/bvaughn/react-window)
 
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Demo
+
+A live demo of the application will be available soon.
+

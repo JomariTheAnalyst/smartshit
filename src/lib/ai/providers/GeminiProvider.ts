@@ -1,45 +1,84 @@
-import { LLMProvider } from './ProviderRouter'
+import { AIProvider, AIResponse } from '@/types/ai'
 
-// Gemini Provider class
-export class GeminiProvider implements LLMProvider {
-  id: string = 'gemini'
-  name: string = 'Gemini'
-  description: string = 'Google\'s Gemini LLM'
-  capabilities: string[] = [
-    'text_generation',
-    'chat',
-    'complex_reasoning',
-    'code_generation',
-    'data_analysis'
-  ]
-  maxTokens: number = 8192
-  costPerToken: number = 0.00001
-  latency: 'low' | 'medium' | 'high' = 'low'
-  
+export class GeminiProvider implements AIProvider {
   private apiKey: string
-  
+  private baseUrl: string = 'https://generativelanguage.googleapis.com/v1beta/models'
+  private model: string = 'gemini-pro'
+
   constructor(apiKey: string) {
     this.apiKey = apiKey
   }
-  
-  // Generate text with Gemini
-  async generateText(prompt: string, options?: any): Promise<string> {
-    // This would use the Gemini API to generate text
-    // For now, return a placeholder response
-    
-    console.log('Generating text with Gemini:', prompt)
-    
-    return `This is a placeholder response from Gemini for the prompt: "${prompt}"`
+
+  async generateResponse(prompt: string, context: any): Promise<AIResponse> {
+    try {
+      const url = `${this.baseUrl}/${this.model}:generateContent?key=${this.apiKey}`
+      
+      const requestBody = {
+        contents: [
+          {
+            parts: [
+              {
+                text: this.formatPrompt(prompt, context)
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 1024
+        }
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(`Gemini API error: ${errorData.error?.message || response.statusText}`)
+      }
+
+      const data = await response.json()
+      
+      // Extract the response text from the Gemini API response
+      const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      
+      return {
+        response: responseText,
+        provider: 'gemini',
+        model: this.model,
+        usage: {
+          promptTokens: 0, // Gemini doesn't provide token usage info in the same way
+          completionTokens: 0,
+          totalTokens: 0
+        }
+      }
+    } catch (error) {
+      console.error('Error calling Gemini API:', error)
+      throw error
+    }
   }
-  
-  // Generate chat response with Gemini
-  async generateChat(messages: Array<{ role: string; content: string }>, options?: any): Promise<string> {
-    // This would use the Gemini API to generate a chat response
-    // For now, return a placeholder response
-    
-    console.log('Generating chat response with Gemini:', messages)
-    
-    return `This is a placeholder chat response from Gemini for the conversation with ${messages.length} messages.`
+
+  private formatPrompt(prompt: string, context: any): string {
+    // Create a formatted prompt with context information
+    return `
+You are an AI assistant for a spreadsheet application. You help users with spreadsheet tasks.
+
+Current context:
+- Active sheet: ${context.activeSheet || 'None'}
+- Active cell: ${context.activeCell || 'None'}
+- Selection: ${context.selection ? JSON.stringify(context.selection) : 'None'}
+
+User request: ${prompt}
+
+Provide a helpful response that addresses the user's request in the context of their spreadsheet.
+`
   }
 }
 

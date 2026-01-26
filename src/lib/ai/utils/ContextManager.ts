@@ -1,53 +1,96 @@
-// Context Manager class
+interface ConversationEntry {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  timestamp: number
+}
+
 export class ContextManager {
-  private context: Record<string, any> = {}
-  private conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  private context: any
+  private conversationHistory: ConversationEntry[]
+  private lastAction: string | null
+  private maxHistoryLength: number
   
-  // Set a context value
-  setContext(key: string, value: any): void {
-    this.context[key] = value
-  }
-  
-  // Get a context value
-  getContextValue(key: string): any {
-    return this.context[key]
-  }
-  
-  // Get the entire context
-  getContext(): Record<string, any> {
-    return { ...this.context }
-  }
-  
-  // Clear the context
-  clearContext(): void {
+  constructor() {
     this.context = {}
-  }
-  
-  // Add a message to the conversation history
-  addMessage(role: 'user' | 'assistant', content: string): void {
-    this.conversationHistory.push({ role, content })
-  }
-  
-  // Get the conversation history
-  getConversationHistory(): Array<{ role: 'user' | 'assistant'; content: string }> {
-    return [...this.conversationHistory]
-  }
-  
-  // Clear the conversation history
-  clearConversationHistory(): void {
     this.conversationHistory = []
+    this.lastAction = null
+    this.maxHistoryLength = 20
   }
   
-  // Get the conversation history as a string
-  getConversationHistoryString(): string {
-    return this.conversationHistory
-      .map(message => `${message.role}: ${message.content}`)
-      .join('\n')
+  updateContext(newContext: any): void {
+    this.context = {
+      ...this.context,
+      ...newContext
+    }
   }
   
-  // Get the recent conversation history (last n messages)
-  getRecentConversationHistory(n: number): Array<{ role: 'user' | 'assistant'; content: string }> {
-    return this.conversationHistory.slice(-n)
+  getContext(): any {
+    return {
+      ...this.context,
+      conversationHistory: this.conversationHistory,
+      lastAction: this.lastAction
+    }
+  }
+  
+  addToConversation(role: 'user' | 'assistant' | 'system', content: string): void {
+    this.conversationHistory.push({
+      role,
+      content,
+      timestamp: Date.now()
+    })
+    
+    // Limit the history length
+    if (this.conversationHistory.length > this.maxHistoryLength) {
+      this.conversationHistory = this.conversationHistory.slice(
+        this.conversationHistory.length - this.maxHistoryLength
+      )
+    }
+  }
+  
+  getConversationHistory(count: number = this.maxHistoryLength): ConversationEntry[] {
+    return this.conversationHistory.slice(-count)
+  }
+  
+  setLastAction(action: string): void {
+    this.lastAction = action
+  }
+  
+  getLastAction(): string | null {
+    return this.lastAction
+  }
+  
+  resetContext(): void {
+    this.context = {}
+    this.conversationHistory = []
+    this.lastAction = null
+  }
+  
+  getRecentMessages(count: number = 5): string {
+    const recentMessages = this.conversationHistory.slice(-count)
+    
+    return recentMessages.map(entry => 
+      `${entry.role}: ${entry.content}`
+    ).join('\n\n')
+  }
+  
+  getFormattedContext(): string {
+    const { conversationHistory, lastAction, ...restContext } = this.context
+    
+    let formattedContext = 'Current Context:\n'
+    
+    // Add basic context
+    for (const [key, value] of Object.entries(restContext)) {
+      formattedContext += `- ${key}: ${JSON.stringify(value)}\n`
+    }
+    
+    // Add last action
+    formattedContext += `- Last action: ${this.lastAction || 'None'}\n`
+    
+    // Add recent conversation
+    formattedContext += '\nRecent Conversation:\n'
+    formattedContext += this.getRecentMessages()
+    
+    return formattedContext
   }
 }
 

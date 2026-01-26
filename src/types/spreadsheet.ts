@@ -1,146 +1,110 @@
-// Cell value types
-export type CellValueType = 'string' | 'number' | 'boolean' | 'date' | 'error' | 'formula' | 'empty'
-
-// Cell format types
-export type HorizontalAlignment = 'left' | 'center' | 'right' | 'justify'
-export type VerticalAlignment = 'top' | 'middle' | 'bottom'
-export type BorderStyle = 'none' | 'thin' | 'medium' | 'thick' | 'dashed' | 'dotted' | 'double'
-export type NumberFormat = 
-  | 'general' 
-  | 'number' 
-  | 'currency' 
-  | 'accounting' 
-  | 'date' 
-  | 'time' 
-  | 'percentage' 
-  | 'fraction' 
-  | 'scientific' 
-  | 'text' 
-  | 'custom'
-
-// Cell interface
-export interface ICell {
-  value: string | number | boolean | Date | null
-  type: CellValueType
-  formula?: string
-  format?: ICellFormat
-  error?: string
+export interface Cell {
+  value: string | number | boolean | null
+  displayValue?: string
+  type: 'text' | 'number' | 'boolean' | 'formula' | 'date'
+  format?: CellFormat
 }
 
-// Cell format interface
-export interface ICellFormat {
-  numberFormat?: NumberFormat
-  customFormat?: string
-  horizontalAlignment?: HorizontalAlignment
-  verticalAlignment?: VerticalAlignment
-  wrapText?: boolean
-  textRotation?: number
-  indent?: number
-  font?: {
-    name?: string
-    size?: number
-    bold?: boolean
-    italic?: boolean
-    underline?: boolean
-    strikethrough?: boolean
-    color?: string
-  }
-  fill?: {
-    type?: 'solid' | 'pattern' | 'gradient'
-    color?: string
-    patternColor?: string
-  }
-  border?: {
-    top?: { style: BorderStyle; color: string }
-    right?: { style: BorderStyle; color: string }
-    bottom?: { style: BorderStyle; color: string }
-    left?: { style: BorderStyle; color: string }
-  }
+export interface CellFormat {
+  textAlign?: 'left' | 'center' | 'right'
+  verticalAlign?: 'top' | 'middle' | 'bottom'
+  fontFamily?: string
+  fontSize?: number
+  fontWeight?: 'normal' | 'bold'
+  fontStyle?: 'normal' | 'italic'
+  textDecoration?: 'none' | 'underline' | 'line-through'
+  color?: string
+  backgroundColor?: string
+  border?: string
+  numberFormat?: string
+  dateFormat?: string
+  conditionalFormat?: ConditionalFormat
 }
 
-// Sheet interface
-export interface ISheet {
-  id: string
+export interface ConditionalFormat {
+  type: 'greaterThan' | 'lessThan' | 'equal' | 'between' | 'contains' | 'notContains'
+  value1: number | string
+  value2?: number | string
+  format: Partial<CellFormat>
+}
+
+export interface Sheet {
   name: string
-  cells: Record<string, ICell>
   rowCount: number
   columnCount: number
-  rowHeights: Record<number, number>
-  columnWidths: Record<number, number>
-  mergedCells: string[]
-  hiddenRows: number[]
-  hiddenColumns: number[]
-  frozenRows: number
-  frozenColumns: number
+  cells: { [key: string]: Cell }
+  columnWidths: { [key: number]: number }
+  rowHeights: { [key: number]: number }
+  mergedCells: MergedCell[]
+  hidden: boolean
 }
 
-// Workbook interface
-export interface IWorkbook {
-  id: string
-  name: string
-  sheets: ISheet[]
-  activeSheetIndex: number
-}
-
-// Selection interface
-export interface ISelection {
+export interface MergedCell {
   startRow: number
   startCol: number
   endRow: number
   endCol: number
-  type: 'cell' | 'row' | 'column' | 'range'
 }
 
-// Command interface for undo/redo
-export interface ICommand {
-  execute: () => void
-  undo: () => void
-  redo: () => void
-  description: string
+export interface Workbook {
+  name: string
+  sheets: Sheet[]
+  activeSheetIndex: number
 }
 
-// Conditional format interface
-export interface IConditionalFormat {
+export interface ActiveCell {
+  row: number
+  col: number
+}
+
+export interface Selection {
+  startRow: number
+  startCol: number
+  endRow: number
+  endCol: number
+}
+
+export interface CellDragEvent {
+  sourceRow: number
+  sourceCol: number
+  targetRow: number
+  targetCol: number
+  isCopy: boolean
+}
+
+export interface ChartOptions {
+  type: 'bar' | 'line' | 'pie' | 'scatter'
+  title?: string
+  dataRange: string
+  headerRow?: boolean
+  headerColumn?: boolean
+  xAxisTitle?: string
+  yAxisTitle?: string
+  legendPosition?: 'top' | 'right' | 'bottom' | 'left'
+  colors?: string[]
+}
+
+export interface Chart {
   id: string
-  type: 'dataBar' | 'colorScale' | 'iconSet' | 'cellValue' | 'expression'
-  range: string
-  priority: number
-  stopIfTrue?: boolean
-  formula?: string
-  style?: Partial<ICellFormat>
-  
-  // For data bars
-  dataBar?: {
-    minType: 'min' | 'number' | 'percent' | 'formula' | 'percentile'
-    maxType: 'max' | 'number' | 'percent' | 'formula' | 'percentile'
-    minValue?: number | string
-    maxValue?: number | string
-    color: string
-    showValue: boolean
-    gradient: boolean
+  sheetIndex: number
+  options: ChartOptions
+  position: {
+    top: number
+    left: number
+    width: number
+    height: number
   }
-  
-  // For color scales
-  colorScale?: {
-    colors: string[]
-    values: Array<number | string | null>
-    valueTypes: Array<'min' | 'max' | 'number' | 'percent' | 'formula' | 'percentile'>
-  }
-  
-  // For icon sets
-  iconSet?: {
-    type: '3Arrows' | '3ArrowsGray' | '3Flags' | '3TrafficLights' | '3Signs' | '3Symbols' | '3Symbols2'
-    values: Array<number | string>
-    valueTypes: Array<'number' | 'percent' | 'formula' | 'percentile'>
-    showValue: boolean
-    reverse: boolean
-  }
-  
-  // For cell value rules
-  cellValue?: {
-    operator: 'equal' | 'notEqual' | 'greaterThan' | 'lessThan' | 'greaterThanOrEqual' | 'lessThanOrEqual' | 'between' | 'notBetween'
-    value1: number | string
-    value2?: number | string
-  }
+}
+
+export interface SpreadsheetState {
+  workbook: Workbook
+  activeCell: ActiveCell | null
+  selection: Selection | null
+  isEditing: boolean
+  setCellValue: (row: number, col: number, value: string | number | boolean | null) => void
+  setActiveCell: (row: number, col: number) => void
+  setSelection: (selection: Selection | null) => void
+  startEditing: () => void
+  stopEditing: () => void
 }
 

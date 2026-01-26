@@ -1,54 +1,85 @@
-import { LLMProvider } from './ProviderRouter'
+import { AIProvider, AIResponse } from '@/types/ai'
 
-// OpenRouter Provider class
-export class OpenRouterProvider implements LLMProvider {
-  id: string = 'openrouter'
-  name: string = 'OpenRouter'
-  description: string = 'OpenRouter API for accessing multiple LLMs'
-  capabilities: string[] = [
-    'text_generation',
-    'chat',
-    'complex_reasoning',
-    'code_generation',
-    'data_analysis'
-  ]
-  maxTokens: number = 16384
-  costPerToken: number = 0.00002
-  latency: 'low' | 'medium' | 'high' = 'medium'
-  
+export class OpenRouterProvider implements AIProvider {
   private apiKey: string
+  private baseUrl: string = 'https://openrouter.ai/api/v1'
   private model: string
   
-  constructor(apiKey: string, model: string = 'anthropic/claude-3-opus') {
+  constructor(apiKey: string, model: string = 'openai/gpt-4-turbo') {
     this.apiKey = apiKey
     this.model = model
   }
   
-  // Set the model to use
-  setModel(model: string): void {
-    this.model = model
+  async generateResponse(prompt: string, context: any): Promise<AIResponse> {
+    try {
+      const url = `${this.baseUrl}/chat/completions`
+      
+      const requestBody = {
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content: this.getSystemPrompt(context)
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1024
+      }
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+          'HTTP-Referer': 'https://smartsheet-ai.vercel.app', // Replace with your actual domain
+          'X-Title': 'AI-Powered Spreadsheet'
+        },
+        body: JSON.stringify(requestBody)
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(`OpenRouter API error: ${errorData.error?.message || response.statusText}`)
+      }
+      
+      const data = await response.json()
+      
+      // Extract the response text from the OpenRouter API response
+      const responseText = data.choices?.[0]?.message?.content || ''
+      
+      return {
+        response: responseText,
+        provider: 'openrouter',
+        model: this.model,
+        usage: {
+          promptTokens: data.usage?.prompt_tokens || 0,
+          completionTokens: data.usage?.completion_tokens || 0,
+          totalTokens: data.usage?.total_tokens || 0
+        }
+      }
+    } catch (error) {
+      console.error('Error calling OpenRouter API:', error)
+      throw error
+    }
   }
   
-  // Generate text with OpenRouter
-  async generateText(prompt: string, options?: any): Promise<string> {
-    // This would use the OpenRouter API to generate text
-    // For now, return a placeholder response
-    
-    console.log('Generating text with OpenRouter:', prompt)
-    console.log('Using model:', this.model)
-    
-    return `This is a placeholder response from OpenRouter (${this.model}) for the prompt: "${prompt}"`
-  }
-  
-  // Generate chat response with OpenRouter
-  async generateChat(messages: Array<{ role: string; content: string }>, options?: any): Promise<string> {
-    // This would use the OpenRouter API to generate a chat response
-    // For now, return a placeholder response
-    
-    console.log('Generating chat response with OpenRouter:', messages)
-    console.log('Using model:', this.model)
-    
-    return `This is a placeholder chat response from OpenRouter (${this.model}) for the conversation with ${messages.length} messages.`
+  private getSystemPrompt(context: any): string {
+    return `
+You are an AI assistant for a spreadsheet application. You help users with spreadsheet tasks.
+
+Current context:
+- Active sheet: ${context.activeSheet || 'None'}
+- Active cell: ${context.activeCell || 'None'}
+- Selection: ${context.selection ? JSON.stringify(context.selection) : 'None'}
+
+Your role is to assist the user with their spreadsheet tasks. You can help with formulas, data analysis, formatting, and other spreadsheet-related tasks.
+
+Always provide clear, concise, and helpful responses. If you need to suggest a formula or code, format it properly.
+`
   }
 }
 
